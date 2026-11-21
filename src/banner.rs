@@ -30,6 +30,7 @@ pub fn body_preview(body: &str) -> Option<String> {
         {
             if let Some(end) = chars[i..].iter().position(|&x| x == '>') {
                 i += end + 1;
+                out.push(' ');
                 continue;
             }
         }
@@ -37,6 +38,7 @@ pub fn body_preview(body: &str) -> Option<String> {
         i += 1;
     }
     let decoded = out
+        .replace("&nbsp;", " ")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
@@ -203,6 +205,13 @@ mod tests {
     use super::*;
     #[test] fn body_preview_strips_markup_and_collapses_whitespace() {
         assert_eq!(body_preview("<b>Disk</b>   is\n\n  <a href=\"x\">full</a>").as_deref(), Some("Disk is full"));
+    }
+    #[test] fn body_preview_tag_separates_words() {
+        assert_eq!(body_preview("a<br>b").as_deref(), Some("a b"));
+        assert_eq!(body_preview("<p>one</p><p>two</p>").as_deref(), Some("one two"));
+    }
+    #[test] fn body_preview_decodes_nbsp_to_space() {
+        assert_eq!(body_preview("a&nbsp;b").as_deref(), Some("a b"));
     }
     #[test] fn body_preview_empty_is_none() { assert_eq!(body_preview("  \n "), None); }
     #[test] fn action_buttons_drops_default_and_keeps_order() {
