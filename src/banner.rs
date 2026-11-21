@@ -104,21 +104,24 @@ pub fn card<'a, M: Clone + 'a>(
     .on_press(on_dismiss)
     .class(cosmic::theme::Button::Icon);
 
+    // Only icon + text activate; × is a sibling outside the mouse_area.
+    let activate = mouse_area(
+        Row::new()
+            .push(notif_icon)
+            .push(texts)
+            .spacing(12)
+            .align_y(Alignment::Center)
+            .width(Length::Fill),
+    )
+    .on_press(on_activate);
+
     let upper = Row::new()
-        .push(
-            Row::new()
-                .push(notif_icon)
-                .push(texts)
-                .spacing(12)
-                .align_y(Alignment::Center)
-                .width(Length::Fill),
-        )
+        .push(activate)
         .push(close)
         .spacing(8)
         .align_y(Alignment::Start);
 
-    let upper = mouse_area(container(upper).padding(PADDING).width(Length::Fill))
-        .on_press(on_activate);
+    let upper = container(upper).padding(PADDING).width(Length::Fill);
 
     let mut content = Column::new().push(upper).width(Length::Fill);
 
