@@ -49,20 +49,26 @@ tokio-console: build-release
 
 # Stock daemon version this fork is based on (upstream tag epoch-1.11.0)
 stock-version := '1.11.0'
-bin-dst := '/usr/local/bin/cosmic-notifications'
+fork-dst := '/usr/local/libexec/cosmic-ext-notifications/cosmic-notifications'
+launcher-dst := '/usr/local/bin/cosmic-notifications'
 
-# Installs the fork to /usr/local/bin, ahead of the stock daemon (run `just build-release` first)
+# Installs the fork and its fallback launcher under /usr/local (run `just build-release` first)
 install:
     #!/usr/bin/env sh
     set -e
     [ "$(rpm -q --qf '%{VERSION}' cosmic-notifications)" = {{stock-version}} ] || { echo "cosmic-notifications is not {{stock-version}} — rebase the fork first"; exit 1; }
     [ -x {{bin-src}} ] || { echo "{{bin-src}} missing — run 'just build-release' first"; exit 1; }
-    sudo install -Dm755 {{bin-src}} {{bin-dst}}
+    sudo install -Dm755 {{bin-src}} {{fork-dst}}
+    sudo install -Dm755 data/cosmic-notifications-launcher.sh {{launcher-dst}}
     echo "Installed. Takes effect at next login."
 
-# Removes the fork; COSMIC's stock daemon is used again from next login
+# Removes the fork and its launcher; COSMIC's stock daemon is used again from next login
 uninstall:
-    sudo rm -f {{bin-dst}}
+    sudo rm -f {{fork-dst}} {{launcher-dst}}
+
+# Tests the fallback launcher
+test-launcher:
+    sh tests/launcher.sh
 
 # Vendor dependencies locally
 vendor:
