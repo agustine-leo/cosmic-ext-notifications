@@ -25,7 +25,7 @@ WINDOW=5
 if [ -n "${CEN_RPM_VERSION+set}" ]; then
     current=$CEN_RPM_VERSION
 else
-    current=$(rpm -q --qf '%{VERSION}' cosmic-notifications 2>/dev/null) || current=
+    current=$(timeout 3 rpm -q --qf '%{VERSION}' cosmic-notifications 2>/dev/null) || current=
 fi
 built=$(cat "$STAMP" 2>/dev/null) || built=
 if [ -z "$built" ] || [ "$built" != "$current" ]; then

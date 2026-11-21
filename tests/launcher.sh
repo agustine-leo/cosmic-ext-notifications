@@ -91,6 +91,19 @@ out=$(CEN_RPM_VERSION='' CEN_FORK="$fork" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=sto
 check "stock version unknown -> stock started" "stock-started" "$out"
 check "stock version unknown -> fork not started" "no" "$(was_started)"
 
+# rpm query hangs (stuck rpmdb) -> gives up after 3 s and starts stock.
+fakebin=$(mktemp -d)
+printf '#!/bin/sh\nsleep 10\necho 1.11.0\n' > "$fakebin/rpm"
+chmod +x "$fakebin/rpm"
+rm -f "$started"
+t0=$(date +%s)
+out=$(env -u CEN_RPM_VERSION PATH="$fakebin:$PATH" CEN_FORK="$fork" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
+elapsed=$(( $(date +%s) - t0 ))
+check "rpm hangs -> stock started" "stock-started" "$out"
+check "rpm hangs -> fork not started" "no" "$(was_started)"
+check "rpm hangs -> gives up within 5 s" "yes" "$([ "$elapsed" -lt 5 ] && echo yes || echo no)"
+rm -r "$fakebin"
+
 rm -f "$started" "$fork" "$stamp"
 
 [ "$fail" = 0 ] && echo "all launcher tests passed"
