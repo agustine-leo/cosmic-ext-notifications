@@ -32,8 +32,10 @@ pub fn body_preview(body: &str) -> Option<String> {
                 .is_some_and(|n| n.is_ascii_alphabetic() || *n == '/')
         {
             if let Some(end) = chars[i..].iter().position(|&x| x == '>') {
+                if is_block_tag(&chars[i + 1..i + end]) {
+                    out.push(' ');
+                }
                 i += end + 1;
-                out.push(' ');
                 continue;
             }
         }
@@ -49,6 +51,21 @@ pub fn body_preview(body: &str) -> Option<String> {
         .replace("&amp;", "&");
     let collapsed = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
     (!collapsed.is_empty()).then_some(collapsed)
+}
+
+/// Whether a tag (the text between `<` and `>`) breaks a line or block, so
+/// removing it must leave a space; inline tags (b, i, a, span, ...) do not.
+fn is_block_tag(inner: &[char]) -> bool {
+    let name: String = inner
+        .iter()
+        .skip_while(|c| **c == '/')
+        .take_while(|c| !c.is_whitespace() && **c != '/' && **c != '>')
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    matches!(
+        name.as_str(),
+        "br" | "p" | "div" | "li" | "ul" | "ol" | "tr" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+    )
 }
 
 /// Buttons to show on a banner: never `Default`, order kept, max 3.
@@ -219,6 +236,13 @@ mod tests {
     #[test] fn surface_min_height_does_not_pad_smallest_card() {
         let smallest_card = f32::from(2 * PADDING + ICON_SIZE);
         assert!(SURFACE_MIN_HEIGHT < smallest_card, "{SURFACE_MIN_HEIGHT} >= {smallest_card}");
+    }
+    #[test] fn body_preview_inline_tags_do_not_split_words() {
+        assert_eq!(body_preview("<b>Dis</b>k").as_deref(), Some("Disk"));
+        assert_eq!(body_preview("<b>Name</b>: hi").as_deref(), Some("Name: hi"));
+        assert_eq!(body_preview("<a href=\"x\">link</a>.").as_deref(), Some("link."));
+        assert_eq!(body_preview("a<br/>b").as_deref(), Some("a b"));
+        assert_eq!(body_preview("<p>one</p><p>two</p>").as_deref(), Some("one two"));
     }
     #[test] fn body_preview_empty_is_none() { assert_eq!(body_preview("  \n "), None); }
     #[test] fn action_buttons_drops_default_and_keeps_order() {
