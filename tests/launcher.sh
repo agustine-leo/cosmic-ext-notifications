@@ -15,12 +15,16 @@ check() { # name expected actual
 
 [ -f "$launcher" ] || { echo "FAIL - launcher missing: $launcher"; exit 1; }
 
-# Fork fails immediately -> stock is exec'd with STOCK_ARGS.
-out=$(FORK=/bin/false STOCK=/bin/echo STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
+# Stray session variables with the old, unprefixed names must be ignored.
+# They are set to harmless values so no test can ever reach a real daemon.
+export FORK=/bin/false STOCK=/bin/echo STOCK_ARGS=stray-redirect
+
+# Fork fails immediately -> stock is exec'd with CEN_STOCK_ARGS.
+out=$(CEN_FORK=/bin/false CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
 check "fork fails fast -> stock started" "stock-started" "$out"
 
 # Fork exits 0 -> stock not invoked, launcher exits 0.
-out=$(FORK=/bin/true STOCK=/bin/echo STOCK_ARGS=stock-started sh "$launcher")
+out=$(CEN_FORK=/bin/true CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher")
 status=$?
 check "fork succeeds -> stock not invoked" "" "$out"
 check "fork succeeds -> exit 0" "0" "$status"
@@ -29,7 +33,7 @@ check "fork succeeds -> exit 0" "0" "$status"
 slow=$(mktemp)
 printf '#!/bin/sh\nsleep 6\nexit 3\n' > "$slow"
 chmod +x "$slow"
-out=$(FORK="$slow" STOCK=/bin/echo STOCK_ARGS=stock-started sh "$launcher")
+out=$(CEN_FORK="$slow" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher")
 status=$?
 rm -f "$slow"
 check "fork fails late -> stock not invoked" "" "$out"
@@ -41,7 +45,7 @@ term=$(mktemp)
 printf '#!/bin/sh\ntrap "echo got-term > %s; exit 1" TERM\nwhile :; do sleep 0.1; done\n' "$marker" > "$term"
 chmod +x "$term"
 out_file=$(mktemp)
-FORK="$term" STOCK=/bin/echo STOCK_ARGS=stock-started sh "$launcher" > "$out_file" 2>/dev/null &
+CEN_FORK="$term" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" > "$out_file" 2>/dev/null &
 lpid=$!
 sleep 1
 kill -TERM "$lpid"

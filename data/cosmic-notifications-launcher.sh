@@ -6,10 +6,13 @@
 # (crash on startup, missing library, ...), it hands over to the stock
 # daemon so the session never ends up without notifications.
 #
-# FORK, STOCK and STOCK_ARGS may be overridden from the environment (tests).
+# CEN_FORK, CEN_STOCK and CEN_STOCK_ARGS may be overridden from the
+# environment (tests). The prefix keeps stray session variables from
+# redirecting the daemon.
 
-FORK=${FORK:-/usr/local/libexec/cosmic-ext-notifications/cosmic-notifications}
-STOCK=${STOCK:-/usr/bin/cosmic-notifications}
+FORK=${CEN_FORK:-/usr/local/libexec/cosmic-ext-notifications/cosmic-notifications}
+STOCK=${CEN_STOCK:-/usr/bin/cosmic-notifications}
+STOCK_ARGS=${CEN_STOCK_ARGS:-}
 WINDOW=5
 
 start=$(date +%s)
@@ -35,7 +38,7 @@ done
 
 if [ "$stopping" = 0 ] && [ "$status" -ne 0 ] && [ $(( $(date +%s) - start )) -lt "$WINDOW" ]; then
     echo "cosmic-ext-notifications exited with status $status at startup; starting $STOCK" >&2
-    # shellcheck disable=SC2086 # STOCK_ARGS is a word list on purpose
+    # shellcheck disable=SC2086 # CEN_STOCK_ARGS is a word list on purpose
     exec "$STOCK" $STOCK_ARGS "$@"
 fi
 
