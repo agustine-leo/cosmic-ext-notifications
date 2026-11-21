@@ -51,20 +51,24 @@ tokio-console: build-release
 stock-version := '1.11.0'
 fork-dst := '/usr/local/libexec/cosmic-ext-notifications/cosmic-notifications'
 launcher-dst := '/usr/local/bin/cosmic-notifications'
+# Stock version the installed fork was built for; the launcher falls back to stock when it differs
+stamp-dst := '/usr/local/libexec/cosmic-ext-notifications/built-for-version'
 
 # Installs the fork and its fallback launcher under /usr/local (run `just build-release` first)
 install:
     #!/usr/bin/env sh
     set -e
-    [ "$(rpm -q --qf '%{VERSION}' cosmic-notifications)" = {{stock-version}} ] || { echo "cosmic-notifications is not {{stock-version}} — rebase the fork first"; exit 1; }
+    stock=$(rpm -q --qf '%{VERSION}' cosmic-notifications)
+    [ "$stock" = {{stock-version}} ] || { echo "cosmic-notifications is not {{stock-version}} — rebase the fork first"; exit 1; }
     [ -x {{bin-src}} ] || { echo "{{bin-src}} missing — run 'just build-release' first"; exit 1; }
     sudo install -Dm755 {{bin-src}} {{fork-dst}}
+    printf '%s\n' "$stock" | sudo install -Dm644 /dev/stdin {{stamp-dst}}
     sudo install -Dm755 data/cosmic-notifications-launcher.sh {{launcher-dst}}
     echo "Installed. Takes effect at next login."
 
 # Removes the fork and its launcher; COSMIC's stock daemon is used again from next login
 uninstall:
-    sudo rm -f {{fork-dst}} {{launcher-dst}}
+    sudo rm -f {{fork-dst}} {{stamp-dst}} {{launcher-dst}}
 
 # Tests the fallback launcher
 test-launcher:

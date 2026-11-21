@@ -19,6 +19,11 @@ check() { # name expected actual
 # They are set to harmless values so no test can ever reach a real daemon.
 export FORK=/bin/false STOCK=/bin/echo STOCK_ARGS=stray-redirect
 
+# Version stamp written by `just install`; matches the "installed" stock rpm.
+stamp=$(mktemp)
+echo 1.11.0 > "$stamp"
+export CEN_STAMP="$stamp" CEN_RPM_VERSION=1.11.0
+
 # Fork fails immediately -> stock is exec'd with CEN_STOCK_ARGS.
 out=$(CEN_FORK=/bin/false CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
 check "fork fails fast -> stock started" "stock-started" "$out"
@@ -54,6 +59,39 @@ sleep 0.3
 check "TERM forwarded to fork" "got-term" "$(cat "$marker")"
 check "TERM -> no fallback" "" "$(cat "$out_file")"
 rm -f "$marker" "$term" "$out_file"
+
+# Version stamp: a fork that records it was started.
+started=$(mktemp -u)
+fork=$(mktemp)
+printf '#!/bin/sh\necho fork > %s\nexit 0\n' "$started" > "$fork"
+chmod +x "$fork"
+was_started() { [ -e "$started" ] && echo yes || echo no; }
+
+# Stock rpm upgraded since install -> stock exec'd, fork never started.
+rm -f "$started"
+out=$(CEN_RPM_VERSION=1.12.0 CEN_FORK="$fork" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
+check "version mismatch -> stock started" "stock-started" "$out"
+check "version mismatch -> fork not started" "no" "$(was_started)"
+
+# Stock rpm matches the stamp -> fork started, stock not invoked.
+rm -f "$started"
+out=$(CEN_FORK="$fork" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
+check "version match -> stock not invoked" "" "$out"
+check "version match -> fork started" "yes" "$(was_started)"
+
+# Stamp missing -> stock.
+rm -f "$started"
+out=$(CEN_STAMP=/nonexistent/built-for-version CEN_FORK="$fork" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
+check "stamp missing -> stock started" "stock-started" "$out"
+check "stamp missing -> fork not started" "no" "$(was_started)"
+
+# Stock version unknown (rpm missing / package not installed) -> stock.
+rm -f "$started"
+out=$(CEN_RPM_VERSION='' CEN_FORK="$fork" CEN_STOCK=/bin/echo CEN_STOCK_ARGS=stock-started sh "$launcher" 2>/dev/null)
+check "stock version unknown -> stock started" "stock-started" "$out"
+check "stock version unknown -> fork not started" "no" "$(was_started)"
+
+rm -f "$started" "$fork" "$stamp"
 
 [ "$fail" = 0 ] && echo "all launcher tests passed"
 exit "$fail"
