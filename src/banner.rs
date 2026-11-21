@@ -14,6 +14,9 @@ const ICON_SIZE: u16 = 40;
 const ACTION_HEIGHT: f32 = 40.0;
 
 pub const BANNER_WIDTH: f32 = 420.0;
+/// Minimum height of a banner's layer surface. Must stay below the smallest
+/// card, or every banner is padded and stacked banners drift apart.
+pub const SURFACE_MIN_HEIGHT: f32 = 1.0;
 
 /// Plain-text one-line preview of a notification body: tags stripped,
 /// entities decoded, whitespace collapsed. `None` if nothing remains.
@@ -212,6 +215,10 @@ mod tests {
     }
     #[test] fn body_preview_decodes_nbsp_to_space() {
         assert_eq!(body_preview("a&nbsp;b").as_deref(), Some("a b"));
+    }
+    #[test] fn surface_min_height_does_not_pad_smallest_card() {
+        let smallest_card = f32::from(2 * PADDING + ICON_SIZE);
+        assert!(SURFACE_MIN_HEIGHT < smallest_card, "{SURFACE_MIN_HEIGHT} >= {smallest_card}");
     }
     #[test] fn body_preview_empty_is_none() { assert_eq!(body_preview("  \n "), None); }
     #[test] fn action_buttons_drops_default_and_keeps_order() {

@@ -482,7 +482,7 @@ impl CosmicNotifications {
                         Element::from(
                             autosize::autosize(card_list, autosize_id.1.clone())
                                 .min_width(200.)
-                                .min_height(100.)
+                                .min_height(banner::SURFACE_MIN_HEIGHT)
                                 .max_width(BANNER_WIDTH)
                                 .max_height(1920.),
                         )
