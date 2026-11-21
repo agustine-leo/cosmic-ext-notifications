@@ -63,8 +63,6 @@ pub fn card_radius(theme: &cosmic::Theme) -> [f32; 4] {
 
 /// GNOME-style notification banner: icon, bold title, dim body, × at the
 /// top right, optional equal-width action row flush to the bottom.
-// Not yet called by the daemon (wired in by the next task).
-#[allow(dead_code)]
 pub fn card<'a, M: Clone + 'a>(
     n: &'a Notification,
     on_activate: M,

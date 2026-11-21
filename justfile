@@ -10,16 +10,6 @@ export INSTALL_DIR := base-dir / 'share'
 
 cargo-target-dir := env('CARGO_TARGET_DIR', 'target')
 bin-src := cargo-target-dir / 'release' / name
-bin-dst := base-dir / 'bin' / name
-
-# Use lld linker if available
-ld-args := if `which lld || true` != '' {
-    '-C link-arg=-fuse-ld=lld -C link-arg=-Wl,--build-id=sha1 -Clink-arg=-Wl,--no-rosegment'
-} else {
-    ''
-}
-
-export RUSTFLAGS := env_var_or_default('RUSTFLAGS', '') + ' --cfg tokio_unstable ' + ld-args
 
 # Default recipe which runs `just build-release`
 default: build-release
@@ -37,7 +27,7 @@ build-debug *args:
     cargo build {{args}}
 
 # Compiles with release profile
-build-release *args: (build-debug '--release' args)
+build-release *args: (build-debug '--release' '--locked' args)
 
 # Compiles release profile with vendored dependencies
 build-vendored *args: vendor-extract (build-release '--frozen --offline' args)
@@ -57,13 +47,22 @@ run: build-release
 tokio-console: build-release
     env TOKIO_CONSOLE=1 {{cargo-target-dir}}/release/cosmic-notifications
 
-# Installs files
-install:
-    install -Dm0755 {{bin-src}} {{bin-dst}}
+# Stock daemon version this fork is based on (upstream tag epoch-1.11.0)
+stock-version := '1.11.0'
+bin-dst := '/usr/local/bin/cosmic-notifications'
 
-# Uninstalls installed files
+# Installs the fork to /usr/local/bin, ahead of the stock daemon (run `just build-release` first)
+install:
+    #!/usr/bin/env sh
+    set -e
+    [ "$(rpm -q --qf '%{VERSION}' cosmic-notifications)" = {{stock-version}} ] || { echo "cosmic-notifications is not {{stock-version}} — rebase the fork first"; exit 1; }
+    [ -x {{bin-src}} ] || { echo "{{bin-src}} missing — run 'just build-release' first"; exit 1; }
+    sudo install -Dm755 {{bin-src}} {{bin-dst}}
+    echo "Installed. Takes effect at next login."
+
+# Removes the fork; COSMIC's stock daemon is used again from next login
 uninstall:
-    rm {{bin-dst}}
+    sudo rm -f {{bin-dst}}
 
 # Vendor dependencies locally
 vendor:

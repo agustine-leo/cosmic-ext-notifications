@@ -1,3 +1,4 @@
+use crate::banner::{self, BANNER_WIDTH};
 use crate::subscriptions::notifications;
 use cosmic::app::{Core, Settings};
 use cosmic::core::Auto;
@@ -14,20 +15,17 @@ use cosmic::iced::platform_specific::shell::wayland::commands::{
 };
 use cosmic::iced::runtime::platform_specific::wayland::CornerRadius;
 use cosmic::iced::runtime::platform_specific::wayland::popup::{SctkPopupSettings, SctkPositioner};
-use cosmic::iced::widget::{column, rich_text, row, space};
+use cosmic::iced::widget::{column, space};
 use cosmic::iced::window::Id as SurfaceId;
-use cosmic::iced::{self, Length, Limits, Subscription, id};
+use cosmic::iced::{self, Length, Limits, Subscription};
 use cosmic::surface;
 use cosmic::surface::action::LiveSettings;
-use cosmic::widget::{autosize, button, icon, text};
+use cosmic::widget::autosize;
 use cosmic::{Application, Element, app::Task};
 use cosmic_notifications_config::NotificationsConfig;
-use cosmic_notifications_util::markup::html_to_spans;
 use cosmic_notifications_util::{ActionId, CloseReason, Notification};
 use cosmic_panel_config::{CosmicPanelConfig, CosmicPanelOuput, PanelAnchor};
 use enumflags2::BitFlags;
-use iced::Alignment;
-use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -56,7 +54,6 @@ struct CosmicNotifications {
     pending_notifications: Vec<Notification>,
     cards: Vec<Notification>,
     hidden: VecDeque<Notification>,
-    notifications_id: id::Id,
     notifications_tx: Option<mpsc::Sender<notifications::Input>>,
     config: NotificationsConfig,
     dock_config: CosmicPanelConfig,
@@ -68,6 +65,7 @@ struct CosmicNotifications {
 #[derive(Debug, Clone)]
 enum Message {
     ActivateNotification(u32),
+    InvokeAction(u32, ActionId),
     ActivationToken(Option<String>, u32, Option<ActionId>),
     Dismissed(u32),
     Notification(notifications::Event),
@@ -75,7 +73,6 @@ enum Message {
     Config(NotificationsConfig),
     PanelConfig(CosmicPanelConfig),
     DockConfig(CosmicPanelConfig),
-    Ignore,
     Surface(surface::Action<Message>),
     PopupSize(SurfaceId, iced::Size),
 }
@@ -315,13 +312,13 @@ impl CosmicNotifications {
                     bottom: 8,
                     left: 8,
                 },
-                size: Some((Some(300), Some(1))),
+                size: Some((Some(BANNER_WIDTH as u32), Some(1))),
                 output: IcedOutput::Active, // TODO should we only create the notification on the output the applet is on?
                 size_limits: Limits::NONE
-                    .min_width(300.0)
+                    .min_width(BANNER_WIDTH)
                     .min_height(1.0)
                     .max_height(1920.0)
-                    .max_width(300.0),
+                    .max_width(BANNER_WIDTH),
                 ..Default::default()
             }));
         };
@@ -351,14 +348,14 @@ impl CosmicNotifications {
                     SctkPositioner {
                         size: None,
                         size_limits: Limits::NONE
-                            .min_width(300.0)
+                            .min_width(BANNER_WIDTH)
                             .min_height(1.0)
                             .max_height(1920.0)
-                            .max_width(300.0),
+                            .max_width(BANNER_WIDTH),
                         anchor_rect: iced::Rectangle {
                             x: 0,
                             y: 6,
-                            width: 300,
+                            width: BANNER_WIDTH as i32,
                             height: 1,
                         },
                         anchor: if self
@@ -399,10 +396,10 @@ impl CosmicNotifications {
                     SctkPositioner {
                         size: None,
                         size_limits: Limits::NONE
-                            .min_width(300.0)
+                            .min_width(BANNER_WIDTH)
                             .min_height(1.0)
                             .max_height(1920.0)
-                            .max_width(300.0),
+                            .max_width(BANNER_WIDTH),
                         anchor_rect: p_size
                             .map(|s| iced::Rectangle {
                                 x: 0,
@@ -469,94 +466,40 @@ impl CosmicNotifications {
                             return space::horizontal().height(300).into();
                         }
 
-                        let (ids, notif_elems) = app
-                            .cards
-                            .iter()
-                            .rev()
-                            .map(|n| {
-                                let app_name = text::caption(if n.app_name.len() > 24 {
-                                    Cow::from(format!(
-                                        "{:.26}...",
-                                        n.app_name.lines().next().unwrap_or_default()
-                                    ))
-                                } else {
-                                    Cow::from(&n.app_name)
-                                })
-                                .width(Length::Fill);
-
-                                let close_notif = button::custom(
-                                    icon::from_name("window-close-symbolic")
-                                        .size(16)
-                                        .symbolic(true),
-                                )
-                                .on_press(Message::Dismissed(n.id))
-                                .class(cosmic::theme::Button::Text);
-
-                                let e = Element::from(
-                                    column!(
-                                        if let Some(icon) = n.notification_icon() {
-                                            row![icon.size(16), app_name, close_notif]
-                                                .spacing(8)
-                                                .align_y(Alignment::Center)
-                                        } else {
-                                            row![app_name, close_notif]
-                                                .spacing(8)
-                                                .align_y(Alignment::Center)
-                                        },
-                                        column![
-                                            text::body(
-                                                n.summary.lines().next().unwrap_or_default()
-                                            )
-                                            .width(Length::Fill),
-                                            Element::from(
-                                                rich_text(html_to_spans(&n.body)).size(12.0)
-                                            )
-                                            .map(|_: ()| Message::Ignore)
-                                        ]
-                                    )
-                                    .width(Length::Fill),
-                                );
-                                (n.id, e)
-                            })
-                            .nth(nth)
-                            .unzip();
-
-                        let card_list = cosmic::widget::cards(
-                            app.notifications_id.clone(),
-                            notif_elems.into_iter().collect(),
-                            Message::Ignore,
-                            None::<fn(bool) -> Message>,
-                            Some(move |_| Message::ActivateNotification(ids.unwrap())),
-                            "",
-                            "",
-                            "",
-                            None,
-                            true,
-                        )
-                        .width(Length::Fixed(300.));
+                        let Some(n) = app.cards.iter().rev().nth(nth) else {
+                            return space::horizontal().height(300).into();
+                        };
+                        let id = n.id;
+                        let card_list = column![banner::card(
+                            n,
+                            Message::ActivateNotification(id),
+                            Message::Dismissed(id),
+                            move |a| Message::InvokeAction(id, a),
+                        )]
+                        .spacing(8)
+                        .width(Length::Fixed(BANNER_WIDTH));
 
                         Element::from(
                             autosize::autosize(card_list, autosize_id.1.clone())
                                 .min_width(200.)
                                 .min_height(100.)
-                                .max_width(300.)
+                                .max_width(BANNER_WIDTH)
                                 .max_height(1920.),
                         )
                         .map(cosmic::Action::App)
                     })),
                 ),
             ));
-            let rad_xs = self.core.system_theme().cosmic().radius_xs();
+            let rad = banner::card_radius(&self.core.system_theme());
 
             tasks.push(
                 corner_radius(
                     p_id,
-                    // TODO use the theme for this and the cards...
                     Some(CornerRadius {
-                        top_left: rad_xs[0].round() as u32,
-                        top_right: rad_xs[1].round() as u32,
-                        bottom_left: rad_xs[2].round() as u32,
-                        bottom_right: rad_xs[3].round() as u32,
+                        top_left: rad[0].round() as u32,
+                        top_right: rad[1].round() as u32,
+                        bottom_right: rad[2].round() as u32,
+                        bottom_left: rad[3].round() as u32,
                     }),
                 )
                 .discard(),
@@ -731,7 +674,6 @@ impl cosmic::Application for CosmicNotifications {
                 config,
                 dock_config: CosmicPanelConfig::default(),
                 panel_config: CosmicPanelConfig::default(),
-                notifications_id: id::Id::new("Notifications"),
                 notifications_tx: None,
                 pending_notifications: Vec::new(),
                 cards: Vec::with_capacity(50),
@@ -760,6 +702,10 @@ impl cosmic::Application for CosmicNotifications {
             Message::ActivateNotification(id) => {
                 tracing::trace!("requesting token for {id}");
                 return self.request_activation(id, None);
+            }
+            Message::InvokeAction(id, action) => {
+                tracing::trace!("requesting token for {id} action {action:?}");
+                return self.request_activation(id, Some(action));
             }
             Message::ActivationToken(token, id, action) => {
                 tracing::trace!("token for {id}");
@@ -826,7 +772,6 @@ impl cosmic::Application for CosmicNotifications {
                 self.dock_config = c;
                 self.anchor = Some(self.anchor_for_notification_applet());
             }
-            Message::Ignore => {}
             Message::Surface(a) => {
                 return cosmic::task::message(cosmic::Action::Surface(a));
             }
@@ -837,7 +782,7 @@ impl cosmic::Application for CosmicNotifications {
                 size.width = size.width.max(1.);
                 size.height = size.height.max(1.);
                 p.2 = Some(size);
-                let rad_xs = self.core.system_theme().cosmic().radius_xs();
+                let rad = banner::card_radius(&self.core.system_theme());
 
                 let pending = std::mem::take(&mut self.pending_notifications);
 
@@ -845,12 +790,11 @@ impl cosmic::Application for CosmicNotifications {
                 tasks.push(
                     corner_radius(
                         id,
-                        // TODO use the theme for this and the cards...
                         Some(CornerRadius {
-                            top_left: rad_xs[0].round() as u32,
-                            top_right: rad_xs[1].round() as u32,
-                            bottom_left: rad_xs[2].round() as u32,
-                            bottom_right: rad_xs[3].round() as u32,
+                            top_left: rad[0].round() as u32,
+                            top_right: rad[1].round() as u32,
+                            bottom_right: rad[2].round() as u32,
+                            bottom_left: rad[3].round() as u32,
                         }),
                     )
                     .discard(),

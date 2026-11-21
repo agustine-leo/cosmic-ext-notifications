@@ -1,44 +1,62 @@
-# Cosmic Notifications
+# cosmic-ext-notifications
 
-Layer Shell notifications daemon which integrates with COSMIC.
+A fork of COSMIC's notifications daemon
+([pop-os/cosmic-notifications](https://github.com/pop-os/cosmic-notifications))
+that draws GNOME-style notification banners: a 420px card with a 40px icon,
+bold one-line title, dimmed two-line body preview, a × close button in the
+top-right corner, and up to three equal-width action buttons along the bottom.
 
-# Building
+Only the banner drawing changes. The D-Bus server, the applet socket, config
+keys, Do Not Disturb, timeouts, limits, grouping and activation all behave as
+in the stock daemon.
 
-Cosmic Notifications is set up to build a deb and a Nix flake, but it can be built using just.
+![Banner screenshot](docs/screenshot.png) <!-- placeholder -->
 
-Some Build Dependencies:
-```
-  cargo,
-  just,
-  intltool,
-  appstream-util,
-  desktop-file-utils,
-  libxkbcommon-dev,
-  pkg-config,
-  desktop-file-utils,
-```
+## Requirements
 
-## Build Commands
+It is based on upstream tag `epoch-1.11.0` and only installs on top of the
+stock `cosmic-notifications` package at version 1.11.0. `just install` checks
+this with `rpm -q --qf '%{VERSION}' cosmic-notifications` and refuses to
+install against any other version. When COSMIC updates, the fork has to be
+rebased onto the new upstream tag first.
 
-For a typical install from source, use `just` followed with `sudo just install`.
+Build dependencies are the same as upstream: `cargo`, `just`, `pkg-config`,
+`libxkbcommon-devel`.
+
+## Install
+
 ```sh
-just
-sudo just install
+just build-release
+just install     # asks for your sudo password
 ```
 
-If you are packaging, run `just vendor` outside of your build chroot, then use `just build-vendored` inside the build-chroot. Then you can specify a custom root directory and prefix.
+This copies the binary to `/usr/local/bin/cosmic-notifications`. That
+directory comes before `/usr/bin` in `PATH`, so cosmic-session starts the fork
+instead of the stock daemon. The stock package is left untouched.
+
+The change takes effect at your next login. Nothing is restarted during
+install.
+
+## Uninstall, or if something breaks
+
+If the banners or notifications break after login, remove the fork and log
+out and back in to get COSMIC's stock daemon back:
+
 ```sh
-# Outside build chroot
-just clean-dist
-just vendor
-
-# Inside build chroot
-just build-vendored
-sudo just rootdir=debian/cosmic-notifications prefix=/usr install
+just uninstall
+# or, without the repo at hand:
+sudo rm /usr/local/bin/cosmic-notifications
 ```
 
-# Debugging & Profiling
+## Development
 
-## Profiling async tasks with tokio-console
+```sh
+cargo test --locked
+cargo run --release --example preview   # renders sample banners in a window
+```
 
-To debug issues with asynchronous code, install [tokio-console](https://github.com/tokio-rs/console) and run it within a separate terminal. Then kill the **cosmic-notifications** process a couple times in quick succession to prevent **cosmic-session** from spawning it again. Then you can start **cosmic-notifications** with **tokio-console** support either by running `just tokio-console` from this repository to test code changes, or `env TOKIO_CONSOLE=1 cosmic-notifications` to enable it with the installed version of **cosmic-notifications**.
+## Credits
+
+The daemon is the work of System76 and the COSMIC contributors in
+[pop-os/cosmic-notifications](https://github.com/pop-os/cosmic-notifications).
+This fork only replaces the banner layout. Licensed GPL-3.0, like upstream.
