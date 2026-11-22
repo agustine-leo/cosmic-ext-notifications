@@ -134,6 +134,9 @@ impl cosmic::Application for Preview {
         let cards = self.notifications.iter().map(|n| {
             banner::card(
                 n,
+                // Samples only use named icons, so the scale (which only
+                // sizes image-data rasters) does not matter here.
+                1.0,
                 Message::Activate(n.id),
                 Message::Dismiss(n.id),
                 move |action| Message::Action(n.id, action),

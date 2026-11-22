@@ -3,7 +3,7 @@ use cosmic::iced::{Alignment, Background, Color, Length};
 use cosmic::iced::widget::{Column, Row};
 use cosmic::iced::core::text::{Ellipsize, EllipsizeHeightLimit};
 use cosmic::widget::{button, container, divider, icon, mouse_area, text};
-use cosmic_notifications_util::{ActionId, Notification};
+use cosmic_notifications_util::{ActionId, Image, Notification};
 
 /// 16x16 close glyph, embedded because some icon themes blank
 /// `window-close-symbolic`. Rendered symbolic so it takes the theme colour.
@@ -78,23 +78,66 @@ pub fn action_buttons(actions: &[(ActionId, String)]) -> Vec<(ActionId, String)>
         .collect()
 }
 
+/// Which icon a banner draws.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum IconChoice {
+    /// `Notification::notification_icon()` at `ICON_SIZE` (file/name images,
+    /// or no image at all).
+    Default,
+    /// The raw `image-data` raster the app sent, at this logical size
+    /// (≤ `ICON_SIZE`), centred in the icon slot.
+    Raster(f32),
+}
+
+/// Pick the banner icon for `n` on a surface with output scale `scale`.
+/// The picture the app sent always wins; it is only ever sized down.
+pub fn icon_choice(n: &Notification, scale: f32) -> IconChoice {
+    match n.image() {
+        Some(Image::Data { width, height, .. }) => {
+            IconChoice::Raster(raster_display_size(*width, *height, scale))
+        }
+        _ => IconChoice::Default,
+    }
+}
+
+/// Logical size for a `w`x`h` raster at output scale `scale`:
+/// `min(ICON_SIZE, w / scale, h / scale)`, so it is never drawn with more
+/// physical pixels than it has. A non-positive or non-finite scale counts
+/// as 1; the result is at least 1.
+pub fn raster_display_size(w: u32, h: u32, scale: f32) -> f32 {
+    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+    (w.min(h) as f32 / scale).clamp(1.0, f32::from(ICON_SIZE))
+}
+
 /// Corner radius of the banner card (theme `radius_m`).
 pub fn card_radius(theme: &cosmic::Theme) -> [f32; 4] {
     theme.cosmic().corner_radii.radius_m
 }
 
 /// GNOME-style notification banner: icon, bold title, dim body, × at the
-/// top right, optional equal-width action row flush to the bottom.
+/// top right, optional equal-width action row flush to the bottom. `scale`
+/// is the output scale factor, used to keep image-data icons sharp.
 pub fn card<'a, M: Clone + 'a>(
     n: &'a Notification,
+    scale: f32,
     on_activate: M,
     on_dismiss: M,
     on_action: impl Fn(ActionId) -> M + 'a,
 ) -> Element<'a, M> {
-    let notif_icon = n
-        .notification_icon()
-        .unwrap_or_else(|| icon::from_name("dialog-information-symbolic").icon())
-        .size(ICON_SIZE);
+    let fallback = || icon::from_name("dialog-information-symbolic").icon();
+    let notif_icon: Element<'a, M> = match icon_choice(n, scale) {
+        IconChoice::Default => n.notification_icon().unwrap_or_else(fallback).size(ICON_SIZE).into(),
+        IconChoice::Raster(size) => {
+            let raster = n.notification_icon().unwrap_or_else(fallback);
+            let raster = raster
+                .width(Length::Fixed(size))
+                .height(Length::Fixed(size))
+                .content_fit(cosmic::iced::ContentFit::Contain);
+            container(raster)
+                .center(Length::Fixed(f32::from(ICON_SIZE)))
+                .into()
+        }
+    };
 
     let title = text::heading(n.summary.lines().next().unwrap_or_default())
         .width(Length::Fill)
@@ -258,5 +301,48 @@ mod tests {
     }
     #[test] fn action_buttons_single_custom_is_shown() {
         assert_eq!(action_buttons(&[(ActionId::Custom("open".into()), "Open".into())]).len(), 1);
+    }
+    fn data(w: u32, h: u32) -> Image { Image::Data { width: w, height: h, data: vec![0; (w * h * 4) as usize] } }
+    fn notif(app_icon: &str, image: Option<Image>) -> Notification {
+        Notification {
+            id: 1,
+            app_name: "app".into(),
+            app_icon: app_icon.into(),
+            summary: "s".into(),
+            body: String::new(),
+            actions: Vec::new(),
+            hints: image.map(|i| vec![cosmic_notifications_util::Hint::Image(i)]).unwrap_or_default(),
+            expire_timeout: -1,
+            time: std::time::SystemTime::UNIX_EPOCH,
+        }
+    }
+    #[test] fn raster_is_sized_by_output_scale() {
+        assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 2.0), IconChoice::Raster(24.0));
+        assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 1.0), IconChoice::Raster(40.0));
+        assert_eq!(icon_choice(&notif("", Some(data(160, 160))), 2.0), IconChoice::Raster(40.0));
+        assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 1.5), IconChoice::Raster(32.0));
+    }
+    #[test] fn app_icon_never_replaces_the_sent_picture() {
+        assert_eq!(icon_choice(&notif("org.telegram.desktop", Some(data(48, 48))), 2.0), IconChoice::Raster(24.0));
+        assert_eq!(icon_choice(&notif("telegram", Some(data(64, 64))), 2.0), IconChoice::Raster(32.0));
+    }
+    #[test] fn file_name_and_missing_images_use_default() {
+        assert_eq!(icon_choice(&notif("telegram", Some(Image::Name("avatar".into()))), 2.0), IconChoice::Default);
+        assert_eq!(icon_choice(&notif("telegram", Some(Image::File("/tmp/a.png".into()))), 2.0), IconChoice::Default);
+        assert_eq!(icon_choice(&notif("telegram", None), 2.0), IconChoice::Default);
+        assert_eq!(icon_choice(&notif("", None), 1.0), IconChoice::Default);
+    }
+    #[test] fn raster_display_size_is_native_over_scale_capped_at_icon_size() {
+        assert_eq!(raster_display_size(48, 48, 2.0), 24.0);
+        assert_eq!(raster_display_size(48, 48, 1.0), f32::from(ICON_SIZE));
+        assert_eq!(raster_display_size(160, 160, 2.0), f32::from(ICON_SIZE));
+        assert_eq!(raster_display_size(64, 32, 2.0), 16.0, "smaller side limits");
+        assert_eq!(raster_display_size(512, 512, 1.0), f32::from(ICON_SIZE));
+    }
+    #[test] fn raster_display_size_guards_bad_input() {
+        assert_eq!(raster_display_size(0, 0, 2.0), 1.0);
+        assert_eq!(raster_display_size(48, 48, 0.0), f32::from(ICON_SIZE));
+        assert_eq!(raster_display_size(48, 48, -2.0), f32::from(ICON_SIZE));
+        assert_eq!(raster_display_size(48, 48, f32::NAN), f32::from(ICON_SIZE));
     }
 }

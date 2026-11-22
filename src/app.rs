@@ -4,10 +4,11 @@ use cosmic::app::{Core, Settings};
 use cosmic::core::Auto;
 use cosmic::cosmic_config::{Config, CosmicConfigEntry};
 use cosmic::iced::event::listen_raw;
+use cosmic::iced::event::{PlatformSpecific, wayland};
 use cosmic::iced::platform_specific::runtime::wayland::layer_surface::{
     IcedMargin, IcedOutput, SctkLayerSurfaceSettings,
 };
-use cosmic::iced::platform_specific::shell::commands::popup::destroy_popup;
+use cosmic::iced::platform_specific::shell::commands::popup::{destroy_popup, reposition};
 use cosmic::iced::platform_specific::shell::wayland::commands::{
     activation,
     corner_radius::corner_radius,
@@ -18,6 +19,7 @@ use cosmic::iced::runtime::platform_specific::wayland::popup::{SctkPopupSettings
 use cosmic::iced::widget::{column, space};
 use cosmic::iced::window::Id as SurfaceId;
 use cosmic::iced::{self, Length, Limits, Subscription};
+use cosmic::cctk::sctk::reexports::client::protocol::wl_output::WlOutput;
 use cosmic::surface;
 use cosmic::surface::action::LiveSettings;
 use cosmic::widget::autosize;
@@ -60,6 +62,11 @@ struct CosmicNotifications {
     panel_config: CosmicPanelConfig,
     anchor: Option<(Anchor, Option<String>)>,
     popups: Vec<(SurfaceId, iced::id::Id, Option<iced::Size>)>,
+    /// Scale factor of the most recently sized banner surface, as reported
+    /// by the compositor (1.0 until the compositor has sent one).
+    surface_scale: Option<f32>,
+    /// Integer `wl_output` scale of every known output.
+    output_scales: Vec<(WlOutput, i32)>,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +82,9 @@ enum Message {
     DockConfig(CosmicPanelConfig),
     Surface(surface::Action<Message>),
     PopupSize(SurfaceId, iced::Size),
+    SurfaceScale(f32),
+    /// Output added/updated (`Some(scale)`) or removed (`None`).
+    OutputScale(WlOutput, Option<i32>),
 }
 
 impl CosmicNotifications {
@@ -339,174 +349,107 @@ impl CosmicNotifications {
             }
         };
         self.group_notifications();
-        if self.popups.len() < self.config.max_notifications as usize
-            && self.cards.len() > self.popups.len()
-        {
-            let (parent, positioner) = if self.popups.is_empty() {
-                (
-                    self.window_id,
-                    SctkPositioner {
-                        size: None,
-                        size_limits: Limits::NONE
-                            .min_width(BANNER_WIDTH)
-                            .min_height(1.0)
-                            .max_height(1920.0)
-                            .max_width(BANNER_WIDTH),
-                        anchor_rect: iced::Rectangle {
-                            x: 0,
-                            y: 6,
-                            width: BANNER_WIDTH as i32,
-                            height: 1,
-                        },
-                        anchor: if self
-                            .anchor
-                            .as_ref()
-                            .is_some_and(|a| a.0.contains(Anchor::BOTTOM))
-                        {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Anchor::Top
-                        } else {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Anchor::Bottom
-                        },
-                        gravity: if self
-                            .anchor
-                            .as_ref()
-                            .is_some_and(|a| a.0.contains(Anchor::BOTTOM))
-                        {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Gravity::Top
-                        } else {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Gravity::Bottom
-                        },
-                        constraint_adjustment: 0, // TODO do we want to allow sliding if there is no other way?
-                        offset: if self
-                            .anchor
-                            .as_ref()
-                            .is_some_and(|a| a.0.contains(Anchor::BOTTOM))
-                        {
-                            (0, -8)
-                        } else {
-                            (0, 8)
-                        },
-                        reactive: true,
-                    },
-                )
-            } else {
-                let (p_id, _, p_size) = self.popups.last().unwrap();
-                (
-                    *p_id,
-                    SctkPositioner {
-                        size: None,
-                        size_limits: Limits::NONE
-                            .min_width(BANNER_WIDTH)
-                            .min_height(1.0)
-                            .max_height(1920.0)
-                            .max_width(BANNER_WIDTH),
-                        anchor_rect: p_size
-                            .map(|s| iced::Rectangle {
-                                x: 0,
-                                y: 0,
-                                width: s.width as i32,
-                                height: s.height as i32,
-                            })
-                            .unwrap_or_default(),
-                        anchor: if self
-                            .anchor
-                            .as_ref()
-                            .is_some_and(|a| a.0.contains(Anchor::BOTTOM))
-                        {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Anchor::Top
-                        } else {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Anchor::Bottom
-                        },
-                        gravity: if self
-                            .anchor
-                            .as_ref()
-                            .is_some_and(|a| a.0.contains(Anchor::BOTTOM))
-                        {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Gravity::Top
-                        } else {
-                            cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::Gravity::Bottom
-                        },
-                        constraint_adjustment: 0, // TODO do we want to allow sliding if there is no other way?
-                        offset: if self
-                            .anchor
-                            .as_ref()
-                            .is_some_and(|a| a.0.contains(Anchor::BOTTOM))
-                        {
-                            (0, -8)
-                        } else {
-                            (0, 8)
-                        },
-                        reactive: true,
-                    },
-                )
-            };
-            let p_id = SurfaceId::unique();
-            let settings = SctkPopupSettings {
-                parent,
-                id: p_id,
-                positioner,
-                parent_size: None,
-                grab: false,
-                close_with_children: false,
-                input_zone: None,
-            };
-
-            let auto_id = iced::id::Id::unique();
-            let nth = self.popups.len();
-            self.popups.push((p_id, auto_id.clone(), None));
-            tasks.push(cosmic::surface::surface_task(
-                cosmic::surface::action::app_popup(
-                    |_| LiveSettings::default(),
-                    move |_: &mut CosmicNotifications| settings.clone(),
-                    Some(Box::new(move |app: &CosmicNotifications| {
-                        let Some(autosize_id) = app.popups.get(nth) else {
-                            return space::horizontal().height(300).into();
-                        };
-                        if app.cards.len() <= nth {
-                            return space::horizontal().height(300).into();
-                        }
-
-                        let Some(n) = app.cards.iter().rev().nth(nth) else {
-                            return space::horizontal().height(300).into();
-                        };
-                        let id = n.id;
-                        let card_list = column![banner::card(
-                            n,
-                            Message::ActivateNotification(id),
-                            Message::Dismissed(id),
-                            move |a| Message::InvokeAction(id, a),
-                        )]
-                        .spacing(8)
-                        .width(Length::Fixed(BANNER_WIDTH));
-
-                        Element::from(
-                            autosize::autosize(card_list, autosize_id.1.clone())
-                                .min_width(200.)
-                                .min_height(banner::SURFACE_MIN_HEIGHT)
-                                .max_width(BANNER_WIDTH)
-                                .max_height(1920.),
-                        )
-                        .map(cosmic::Action::App)
-                    })),
-                ),
-            ));
-            let rad = banner::card_radius(&self.core.system_theme());
-
-            tasks.push(
-                corner_radius(
-                    p_id,
-                    Some(CornerRadius {
-                        top_left: rad[0].round() as u32,
-                        top_right: rad[1].round() as u32,
-                        bottom_right: rad[2].round() as u32,
-                        bottom_left: rad[3].round() as u32,
-                    }),
-                )
-                .discard(),
-            );
+        if self.wants_more_popups() {
+            tasks.extend(self.create_next_popup());
         }
 
         iced::Task::batch(tasks)
+    }
+
+    /// Output scale used to size raster icons. See `effective_scale`.
+    fn scale(&self) -> f32 {
+        let max_output = self.output_scales.iter().map(|(_, s)| *s).max();
+        effective_scale(self.surface_scale, max_output.map(|s| s as f32))
+    }
+
+    /// Whether another banner popup should be shown: fewer popups than the
+    /// configured maximum and more cards than popups.
+    fn wants_more_popups(&self) -> bool {
+        self.popups.len() < self.config.max_notifications as usize
+            && self.cards.len() > self.popups.len()
+    }
+
+    /// Whether the banners stack upwards from a bottom panel.
+    fn bottom_anchored(&self) -> bool {
+        self.anchor.as_ref().is_some_and(|a| a.0.contains(Anchor::BOTTOM))
+    }
+
+    /// Create the popup for the next card (index `self.popups.len()`):
+    /// the first is anchored to the layer surface, each later one below
+    /// (or above, for a bottom panel) the previous popup at its current size.
+    fn create_next_popup(&mut self) -> Vec<Task<Message>> {
+        let mut tasks = Vec::with_capacity(2);
+        let bottom = self.bottom_anchored();
+        let (parent, positioner) = match self.popups.last() {
+            None => (self.window_id, banner_positioner(bottom, BannerParent::LayerSurface)),
+            Some((p_id, _, p_size)) => (*p_id, banner_positioner(bottom, BannerParent::Popup(*p_size))),
+        };
+        let p_id = SurfaceId::unique();
+        let settings = SctkPopupSettings {
+            parent,
+            id: p_id,
+            positioner,
+            parent_size: None,
+            grab: false,
+            close_with_children: false,
+            input_zone: None,
+        };
+
+        let auto_id = iced::id::Id::unique();
+        let nth = self.popups.len();
+        self.popups.push((p_id, auto_id.clone(), None));
+        tasks.push(cosmic::surface::surface_task(
+            cosmic::surface::action::app_popup(
+                |_| LiveSettings::default(),
+                move |_: &mut CosmicNotifications| settings.clone(),
+                Some(Box::new(move |app: &CosmicNotifications| {
+                    let Some(autosize_id) = app.popups.get(nth) else {
+                        return space::horizontal().height(300).into();
+                    };
+                    if app.cards.len() <= nth {
+                        return space::horizontal().height(300).into();
+                    }
+
+                    let Some(n) = app.cards.iter().rev().nth(nth) else {
+                        return space::horizontal().height(300).into();
+                    };
+                    let id = n.id;
+                    let card_list = column![banner::card(
+                        n,
+                        app.scale(),
+                        Message::ActivateNotification(id),
+                        Message::Dismissed(id),
+                        move |a| Message::InvokeAction(id, a),
+                    )]
+                    .spacing(8)
+                    .width(Length::Fixed(BANNER_WIDTH));
+
+                    Element::from(
+                        autosize::autosize(card_list, autosize_id.1.clone())
+                            .min_width(200.)
+                            .min_height(banner::SURFACE_MIN_HEIGHT)
+                            .max_width(BANNER_WIDTH)
+                            .max_height(1920.),
+                    )
+                    .map(cosmic::Action::App)
+                })),
+            ),
+        ));
+        let rad = banner::card_radius(&self.core.system_theme());
+
+        tasks.push(
+            corner_radius(
+                p_id,
+                Some(CornerRadius {
+                    top_left: rad[0].round() as u32,
+                    top_right: rad[1].round() as u32,
+                    bottom_right: rad[2].round() as u32,
+                    bottom_left: rad[3].round() as u32,
+                }),
+            )
+            .discard(),
+        );
+        tasks
     }
 
     fn group_notifications(&mut self) {
@@ -679,6 +622,8 @@ impl cosmic::Application for CosmicNotifications {
                 cards: Vec::with_capacity(50),
                 hidden: VecDeque::new(),
                 popups: Vec::with_capacity(3),
+                surface_scale: None,
+                output_scales: Vec::new(),
             },
             Task::none(),
         )
@@ -775,18 +720,47 @@ impl cosmic::Application for CosmicNotifications {
             Message::Surface(a) => {
                 return cosmic::task::message(cosmic::Action::Surface(a));
             }
+            Message::SurfaceScale(s) => {
+                self.surface_scale = (s.is_finite() && s > 0.0).then_some(s);
+            }
+            Message::OutputScale(output, scale) => {
+                self.output_scales.retain(|(o, _)| *o != output);
+                if let Some(scale) = scale {
+                    self.output_scales.push((output, scale));
+                }
+            }
             Message::PopupSize(id, mut size) => {
-                let Some(p) = self.popups.iter_mut().find(|p| p.0 == id) else {
+                let Some(pos) = self.popups.iter().position(|p| p.0 == id) else {
                     return Task::none();
                 };
                 size.width = size.width.max(1.);
                 size.height = size.height.max(1.);
-                p.2 = Some(size);
+                let old = self.popups[pos].2.replace(size);
                 let rad = banner::card_radius(&self.core.system_theme());
 
                 let pending = std::mem::take(&mut self.pending_notifications);
 
-                let mut tasks = Vec::with_capacity(self.pending_notifications.len() + 1);
+                let mut tasks = Vec::with_capacity(pending.len() + 3);
+                // Real (possibly fractional) scale of this banner's surface.
+                tasks.push(
+                    iced::window::scale_factor(id)
+                        .map(|s| cosmic::action::app(Message::SurfaceScale(s))),
+                );
+                // The next banner is anchored to this popup's size at the time
+                // it was created; move it to the new size. Popups are placed
+                // relative to their parent, so banners further down follow
+                // it, and any of them that resizes repeats this for its own
+                // child.
+                if needs_restack(old, size, pos + 1 < self.popups.len()) {
+                    let child = self.popups[pos + 1].0;
+                    tasks.push(
+                        reposition::<Message>(
+                            child,
+                            banner_positioner(self.bottom_anchored(), BannerParent::Popup(Some(size))),
+                        )
+                        .discard(),
+                    );
+                }
                 tasks.push(
                     corner_radius(
                         id,
@@ -828,6 +802,18 @@ impl cosmic::Application for CosmicNotifications {
                 cosmic::iced::Event::Window(iced::window::Event::Resized(s)) => {
                     Some(Message::PopupSize(id, s))
                 }
+                cosmic::iced::Event::PlatformSpecific(PlatformSpecific::Wayland(
+                    wayland::Event::Output(event, output),
+                )) => match event {
+                    wayland::OutputEvent::Created(info) => Some(Message::OutputScale(
+                        output,
+                        Some(info.map_or(1, |i| i.scale_factor)),
+                    )),
+                    wayland::OutputEvent::InfoUpdate(info) => {
+                        Some(Message::OutputScale(output, Some(info.scale_factor)))
+                    }
+                    wayland::OutputEvent::Removed => Some(Message::OutputScale(output, None)),
+                },
                 _ => None,
             }),
             self.core
@@ -868,5 +854,164 @@ impl cosmic::Application for CosmicNotifications {
                 }),
             notifications::notifications().map(Message::Notification),
         ])
+    }
+}
+
+/// What a banner popup hangs from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum BannerParent {
+    /// The first banner: anchored to the (1 px tall) layer surface.
+    LayerSurface,
+    /// A later banner: anchored to the previous popup, of this size.
+    Popup(Option<iced::Size>),
+}
+
+/// Positioner for a banner popup, used both to create it and to move it
+/// when its parent banner changes height, so the two cannot drift apart.
+/// Banners hang 8 px below their parent (above it for a bottom panel).
+fn banner_positioner(bottom: bool, parent: BannerParent) -> SctkPositioner {
+    use cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::{
+        Anchor as XdgAnchor, Gravity,
+    };
+    let anchor_rect = match parent {
+        BannerParent::LayerSurface => iced::Rectangle {
+            x: 0,
+            y: 6,
+            width: BANNER_WIDTH as i32,
+            height: 1,
+        },
+        BannerParent::Popup(size) => size
+            .map(|s| iced::Rectangle {
+                x: 0,
+                y: 0,
+                width: s.width as i32,
+                height: s.height as i32,
+            })
+            .unwrap_or_default(),
+    };
+    SctkPositioner {
+        size: None,
+        size_limits: Limits::NONE
+            .min_width(BANNER_WIDTH)
+            .min_height(1.0)
+            .max_height(1920.0)
+            .max_width(BANNER_WIDTH),
+        anchor_rect,
+        anchor: if bottom { XdgAnchor::Top } else { XdgAnchor::Bottom },
+        gravity: if bottom { Gravity::Top } else { Gravity::Bottom },
+        constraint_adjustment: 0, // TODO do we want to allow sliding if there is no other way?
+        offset: if bottom { (0, -8) } else { (0, 8) },
+        reactive: true,
+    }
+}
+
+/// Scale used to size raster icons. A surface scale above 1 is the
+/// compositor's real (possibly fractional) value for the banner. A surface
+/// scale of 1 is ambiguous (libcosmic reports 1 until the compositor sends
+/// one), so then, or when none is known, the largest integer output scale is
+/// used: on mixed-scale setups icons may be drawn smaller, never blurrier.
+fn effective_scale(surface: Option<f32>, max_output: Option<f32>) -> f32 {
+    let valid = |s: &f32| s.is_finite() && *s > 0.0;
+    match surface.filter(valid) {
+        Some(s) if s > 1.0 => s,
+        _ => max_output.filter(valid).map_or(1.0, |o| o.max(1.0)),
+    }
+}
+
+/// Whether the banner stacked below a popup must be repositioned after it
+/// reported `new` size (previously `old`). Children are anchored to the
+/// parent's size at creation time, so any height change of ≥ 1 px leaves
+/// them overlapping or gapped. Without children there is nothing to move.
+fn needs_restack(old: Option<iced::Size>, new: iced::Size, has_children: bool) -> bool {
+    has_children && old.is_none_or(|o| (o.height - new.height).abs() >= 1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BannerParent, banner_positioner, effective_scale, needs_restack};
+    use crate::banner::BANNER_WIDTH;
+    use cosmic::cctk::sctk::reexports::protocols::xdg::shell::client::xdg_positioner::{
+        Anchor as XdgAnchor, Gravity,
+    };
+    use cosmic::iced::{Rectangle, Size};
+
+    #[test]
+    fn chained_banner_anchors_to_parent_size() {
+        let p = banner_positioner(false, BannerParent::Popup(Some(Size::new(420., 96.4))));
+        assert_eq!(p.anchor_rect, Rectangle { x: 0, y: 0, width: 420, height: 96 });
+        assert_eq!(p.offset, (0, 8));
+        assert_eq!(p.anchor, XdgAnchor::Bottom);
+        assert_eq!(p.gravity, Gravity::Bottom);
+        assert!(p.reactive);
+    }
+
+    #[test]
+    fn chained_banner_with_unknown_parent_size_uses_empty_rect() {
+        let p = banner_positioner(false, BannerParent::Popup(None));
+        assert_eq!(p.anchor_rect, Rectangle::default());
+    }
+
+    #[test]
+    fn first_banner_anchors_to_layer_surface() {
+        let p = banner_positioner(false, BannerParent::LayerSurface);
+        assert_eq!(p.anchor_rect, Rectangle { x: 0, y: 6, width: BANNER_WIDTH as i32, height: 1 });
+        assert_eq!(p.offset, (0, 8));
+    }
+
+    #[test]
+    fn bottom_panel_stacks_upwards() {
+        let p = banner_positioner(true, BannerParent::Popup(Some(Size::new(420., 64.))));
+        assert_eq!(p.anchor, XdgAnchor::Top);
+        assert_eq!(p.gravity, Gravity::Top);
+        assert_eq!(p.offset, (0, -8));
+    }
+
+    #[test]
+    fn known_surface_scale_wins() {
+        assert_eq!(effective_scale(Some(1.5), Some(2.0)), 1.5);
+        assert_eq!(effective_scale(Some(2.0), Some(1.0)), 2.0);
+        assert_eq!(effective_scale(Some(1.25), None), 1.25);
+    }
+
+    #[test]
+    fn unknown_or_ambiguous_surface_scale_uses_largest_output() {
+        assert_eq!(effective_scale(None, Some(2.0)), 2.0);
+        assert_eq!(effective_scale(Some(1.0), Some(2.0)), 2.0);
+        assert_eq!(effective_scale(Some(1.0), Some(1.0)), 1.0);
+        assert_eq!(effective_scale(Some(1.0), None), 1.0);
+        assert_eq!(effective_scale(None, None), 1.0);
+    }
+
+    #[test]
+    fn invalid_scales_are_ignored() {
+        assert_eq!(effective_scale(Some(f32::NAN), Some(2.0)), 2.0);
+        assert_eq!(effective_scale(Some(0.0), None), 1.0);
+        assert_eq!(effective_scale(None, Some(0.0)), 1.0);
+    }
+
+    #[test]
+    fn no_children_never_restacks() {
+        assert!(!needs_restack(None, Size::new(420., 64.), false));
+        assert!(!needs_restack(Some(Size::new(420., 64.)), Size::new(420., 90.), false));
+    }
+
+    #[test]
+    fn height_growth_with_children_restacks() {
+        assert!(needs_restack(Some(Size::new(420., 64.)), Size::new(420., 90.), true));
+        assert!(needs_restack(Some(Size::new(420., 90.)), Size::new(420., 64.), true));
+        assert!(needs_restack(Some(Size::new(420., 64.)), Size::new(420., 65.), true));
+    }
+
+    #[test]
+    fn sub_pixel_or_width_only_change_does_not_restack() {
+        assert!(!needs_restack(Some(Size::new(420., 64.)), Size::new(420., 64.), true));
+        assert!(!needs_restack(Some(Size::new(420., 64.)), Size::new(420., 64.6), true));
+        assert!(!needs_restack(Some(Size::new(420., 64.)), Size::new(300., 64.), true));
+    }
+
+    #[test]
+    fn unknown_old_size_with_children_restacks() {
+        // Children anchored to an unknown (default 0x0) rect are misplaced.
+        assert!(needs_restack(None, Size::new(420., 64.), true));
     }
 }
