@@ -2,14 +2,17 @@
 name: cosmic-ext-notifications
 description: COSMIC notification banners set as a Nordic railway timetable, with time first, then who, then what.
 colors:
-  timetable-navy: "#121c28"
-  paper: "#f2f0ea"
-  paper-dim: "rgba(242, 240, 234, 0.74)"
-  slate: "#8c98a6"
-  timetable-red: "#c8243a"
-  column-rule: "#2a3647"
-  lifted-navy: "#2a3647"
-  pressed-navy: "#36455a"
+  # Theme roles, resolved from the active COSMIC theme at draw time.
+  # Values shown are the Nord-style dark theme they were verified against.
+  strip: "theme.bg_color"
+  paper: "theme.on_bg_color"
+  paper-dim: "theme.on_bg_color @ 78%"
+  slate: "theme.on_bg_color @ 64%"
+  critical-fill: "theme.destructive_color"
+  on-critical: "theme.on_destructive_color"
+  column-rule: "theme.bg_divider"
+  hover-fill: "theme.background.component.hover"
+  pressed-fill: "theme.background.component.pressed"
 typography:
   time-figures:
     fontFamily: "Cantarell, sans-serif"
@@ -31,7 +34,7 @@ typography:
     fontSize: "11px"
 rounded:
   button: "4px"
-  card: "6px"
+  card: "theme.corner_radii.radius_m"
 spacing:
   xxs: "2px"
   xs: "4px"
@@ -41,7 +44,7 @@ spacing:
   card: "12px"
 components:
   banner-card:
-    backgroundColor: "{colors.timetable-navy}"
+    backgroundColor: "{colors.strip}"
     textColor: "{colors.paper}"
     rounded: "{rounded.card}"
     width: "420px"
@@ -53,7 +56,7 @@ components:
   time-column-low:
     textColor: "{colors.slate}"
   time-column-critical:
-    backgroundColor: "{colors.timetable-red}"
+    backgroundColor: "{colors.critical-fill}"
     textColor: "{colors.paper}"
   button-action:
     textColor: "{colors.paper}"
@@ -61,10 +64,10 @@ components:
     rounded: "{rounded.button}"
     padding: "4px 8px"
   button-action-hover:
-    backgroundColor: "{colors.lifted-navy}"
+    backgroundColor: "{colors.hover-fill}"
     textColor: "{colors.paper}"
   button-action-pressed:
-    backgroundColor: "{colors.pressed-navy}"
+    backgroundColor: "{colors.pressed-fill}"
     textColor: "{colors.paper}"
   button-dismiss:
     textColor: "{colors.slate}"
@@ -72,7 +75,7 @@ components:
     padding: "4px"
     size: "16px"
   button-dismiss-hover:
-    backgroundColor: "{colors.lifted-navy}"
+    backgroundColor: "{colors.hover-fill}"
     textColor: "{colors.paper}"
 ---
 
@@ -82,7 +85,7 @@ components:
 
 **Creative North Star: "The Nordic Timetable"**
 
-Each banner is one row of a printed Nordic departure board: a deep navy strip with paper-white type, read left to right as when, then who, then what. A fixed-width time column on the left carries the arrival time in bold figures and the sending app beneath it; a hairline rule divides it from the content, where the sender picture or app icon sits beside a bold title and a two-line message. Because the time column sits at the same x on every banner, a stack of banners reads as a single table rather than a pile of cards.
+Each banner is one row of a printed Nordic departure board: a strip in the theme background with foreground type, read left to right as when, then who, then what. A fixed-width time column on the left carries the arrival time in bold figures and the sending app beneath it; a hairline rule divides it from the content, where the sender picture or app icon sits beside a bold title and a two-line message. Because the time column sits at the same x on every banner, a stack of banners reads as a single table rather than a pile of cards.
 
 The system is flat, dense and quiet. There is one neutral surface, two text tones and one alarm colour; urgency changes the time column only, never the content. It deliberately departs from the rounded icon-tile notification card of macOS and GNOME, which this desktop's owner rejected as generic.
 
@@ -91,30 +94,29 @@ The surface is a native COSMIC layer-shell banner drawn with libcosmic/iced. Tok
 **Key Characteristics:**
 - A 72px time column at a fixed x on every banner, so stacked banners align as one table.
 - Time figures set in fixed cells (12px per digit, 6px for the colon) so columns of times line up although the face's figures are proportional.
-- Navy strip, paper type, slate secondary, one red reserved for critical urgency.
-- Flat: no shadow, no border, a 6px corner and a 1px column rule.
+- Colours follow the active COSMIC theme: background strip, foreground type, dimmed secondary, the theme's destructive colour reserved for critical urgency.
+- Flat: no shadow, no border, the theme's medium corner radius and a 1px column rule.
 - Actions are bold text, never filled pills.
 
 ## Colors
 
-A near-black navy ground with warm paper type, a cool slate for secondary information, and a single timetable red held back for critical notices.
+The banner takes every colour from the active COSMIC theme (user decision, 2026-11-28: "follow our themes"), so it changes with dark/light mode and accent. The timetable structure carries the identity; the theme carries the colour.
 
 ### Primary
-- **Timetable Red** (`timetable-red`): fills the whole time column of a critical-urgency banner, with paper figures on it. It appears nowhere else.
+- **Critical Fill** (`critical-fill`, theme destructive colour): fills the whole time column of a critical-urgency banner, with `on-critical` figures and app name on it. It appears nowhere else.
 
 ### Neutral
-- **Timetable Navy** (`timetable-navy`): the banner surface. Every banner, every urgency.
-- **Paper** (`paper`): title, time figures (normal and critical), action labels, the hovered dismiss glyph, and the default icon tint.
-- **Paper Dim** (`paper-dim`, paper at 74% opacity): message body text.
-- **Slate** (`slate`): app name under the time, time figures of low-urgency banners, the dismiss glyph at rest, disabled buttons.
-- **Column Rule** (`column-rule`): the 1px vertical rule between time column and content. Hidden on critical banners, where the red fill makes the division.
-- **Lifted Navy** (`lifted-navy`): hover fill of flat buttons. Same value as the column rule.
-- **Pressed Navy** (`pressed-navy`): pressed fill of flat buttons.
+- **Strip** (`strip`, theme background): the banner surface. Every banner, every urgency.
+- **Paper** (`paper`, theme foreground): title, time figures (normal), action labels, hovered button text, default icon tint.
+- **Paper Dim** (`paper-dim`, foreground at 78%): message body text.
+- **Slate** (`slate`, foreground at 64%): app name under the time, time figures of low-urgency banners, the dismiss glyph at rest, disabled buttons.
+- **Column Rule** (`column-rule`, theme divider): the 1px vertical rule between time column and content. Hidden on critical banners, where the fill makes the division.
+- **Hover / Pressed Fill** (theme component hover/pressed): flat button feedback.
 
 ### Named Rules
-**The One Red Rule.** Timetable red marks critical urgency and nothing else. It never tints text, icons, buttons or borders.
+**The One Red Rule.** The theme's destructive colour marks critical urgency and nothing else. It never tints text, icons, buttons or borders.
 
-**The Tier Lives In The Time Column Rule.** Urgency is shown only in the time column: low dims the figures to slate, normal sets them in paper, critical fills the column red. The content side looks the same at every tier.
+**The Tier Lives In The Time Column Rule.** Urgency is shown only in the time column: low dims the figures to slate, normal sets them in paper, critical fills the column with the destructive colour. The content side looks the same at every tier.
 
 ## Typography
 
@@ -144,19 +146,19 @@ Sender pictures sent as raster data are drawn at no more than their native size 
 
 ## Elevation & Depth
 
-Flat. No shadows, no borders, no gradients. The navy against the desktop gives separation, and the column rule organises the inside. Depth shows only as state: flat buttons gain a lighter navy fill on hover and a lighter one again on press.
+Flat. No shadows, no borders, no gradients. The theme background against the desktop gives separation, and the column rule organises the inside. Depth shows only as state: flat buttons gain the theme component hover fill, and its pressed fill on press.
 
 ### Named Rules
 **The Printed Sheet Rule.** A banner is a printed sheet: it never casts a shadow or carries an outline.
 
 ## Shapes
 
-Every banner corner is 6px, fixed by the system rather than the theme so the compositor clip matches the drawn strip; the critical red fill takes the same 6px on its left corners only. Buttons round to 4px and show that shape only when hovered or pressed. The column rule is a straight 1px line from top to bottom of the banner.
+Every banner corner is the theme's medium radius, read by both the drawn strip and the compositor clip so they always match; the critical fill takes the same radius on its left corners only. Buttons round to 4px and show that shape only when hovered or pressed. The column rule is a straight 1px line from top to bottom of the banner.
 
 ## Components
 
 ### Buttons
-Flat text on navy: nothing at rest, a lifted navy on hover, deeper on press.
+Flat text on the strip: nothing at rest, the theme component hover fill on hover, its pressed fill on press.
 - **Shape:** gently rounded (4px), visible only in hover and press states.
 - **Action:** bold 14px paper label, padded 4px by 8px, up to three per banner, in the app's order, in a row with 4px gaps under the message. The default action is never shown as a button; clicking the picture or text triggers it.
 - **Dismiss (×):** 16px close glyph drawn from an embedded SVG and tinted symbolically, slate at rest, padded 4px, at the top right of the content.

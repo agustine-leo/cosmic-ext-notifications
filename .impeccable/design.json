@@ -4,21 +4,156 @@
   "title": "Design System: cosmic-ext-notifications",
   "extensions": {
     "colorMeta": {
-      "timetable-navy": { "role": "neutral", "displayName": "Timetable Navy", "canonical": "oklch(22.3% 0.028 253.5)", "source": "src/banner.rs NAVY", "tonalRamp": ["#080b10", "#20262d", "#3b434d", "#576270", "#788492", "#9ca6b2", "#c2cad3", "#eaeff6"] },
-      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(95.5% 0.008 91.5)", "source": "src/banner.rs PAPER", "tonalRamp": ["#0c0b0a", "#262523", "#43423e", "#63615c", "#84827d", "#a6a5a1", "#cac9c6", "#efeeec"] },
-      "paper-dim": { "role": "neutral", "displayName": "Paper Dim", "canonical": "rgba(242, 240, 234, 0.74)", "source": "src/banner.rs PAPER_DIM", "tonalRamp": ["#0c0b0a", "#262523", "#43423e", "#63615c", "#84827d", "#a6a5a1", "#cac9c6", "#efeeec"] },
-      "slate": { "role": "neutral", "displayName": "Slate", "canonical": "oklch(67.5% 0.025 252.3)", "source": "src/banner.rs SLATE", "tonalRamp": ["#080b0f", "#20262c", "#3b434c", "#58626e", "#798490", "#9da6b0", "#c3cad2", "#eaeff5"] },
-      "timetable-red": { "role": "primary", "displayName": "Timetable Red", "canonical": "oklch(54.2% 0.197 20.7)", "source": "src/banner.rs RED", "tonalRamp": ["#220001", "#4d000c", "#7d0b1e", "#b01e32", "#d94952", "#f27d7e", "#ffacab", "#ffdbd9"] },
-      "column-rule": { "role": "neutral", "displayName": "Column Rule", "canonical": "oklch(33.0% 0.034 257.1)", "source": "src/banner.rs RULE", "tonalRamp": ["#080b11", "#1f252e", "#3a4350", "#566273", "#778395", "#9ba6b5", "#c1cad6", "#e9eff7"] },
-      "lifted-navy": { "role": "neutral", "displayName": "Lifted Navy", "canonical": "oklch(33.0% 0.034 257.1)", "source": "src/banner.rs HOVER", "tonalRamp": ["#080b11", "#1f252e", "#3a4350", "#566273", "#778395", "#9ba6b5", "#c1cad6", "#e9eff7"] },
-      "pressed-navy": { "role": "neutral", "displayName": "Pressed Navy", "canonical": "oklch(38.6% 0.041 256.8)", "source": "src/banner.rs PRESSED", "tonalRamp": ["#070b12", "#1e2630", "#384352", "#546277", "#748499", "#99a6b8", "#c0cad8", "#e8eff9"] }
+      "timetable-navy": {
+        "role": "neutral",
+        "displayName": "Timetable Navy",
+        "canonical": "oklch(22.3% 0.028 253.5)",
+        "source": "src/banner.rs NAVY",
+        "tonalRamp": [
+          "#080b10",
+          "#20262d",
+          "#3b434d",
+          "#576270",
+          "#788492",
+          "#9ca6b2",
+          "#c2cad3",
+          "#eaeff6"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(95.5% 0.008 91.5)",
+        "source": "src/banner.rs PAPER",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#43423e",
+          "#63615c",
+          "#84827d",
+          "#a6a5a1",
+          "#cac9c6",
+          "#efeeec"
+        ]
+      },
+      "paper-dim": {
+        "role": "neutral",
+        "displayName": "Paper Dim",
+        "canonical": "rgba(242, 240, 234, 0.74)",
+        "source": "src/banner.rs PAPER_DIM",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#43423e",
+          "#63615c",
+          "#84827d",
+          "#a6a5a1",
+          "#cac9c6",
+          "#efeeec"
+        ]
+      },
+      "slate": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "canonical": "oklch(67.5% 0.025 252.3)",
+        "source": "src/banner.rs SLATE",
+        "tonalRamp": [
+          "#080b0f",
+          "#20262c",
+          "#3b434c",
+          "#58626e",
+          "#798490",
+          "#9da6b0",
+          "#c3cad2",
+          "#eaeff5"
+        ]
+      },
+      "timetable-red": {
+        "role": "primary",
+        "displayName": "Timetable Red",
+        "canonical": "oklch(54.2% 0.197 20.7)",
+        "source": "src/banner.rs RED",
+        "tonalRamp": [
+          "#220001",
+          "#4d000c",
+          "#7d0b1e",
+          "#b01e32",
+          "#d94952",
+          "#f27d7e",
+          "#ffacab",
+          "#ffdbd9"
+        ]
+      },
+      "column-rule": {
+        "role": "neutral",
+        "displayName": "Column Rule",
+        "canonical": "oklch(33.0% 0.034 257.1)",
+        "source": "src/banner.rs RULE",
+        "tonalRamp": [
+          "#080b11",
+          "#1f252e",
+          "#3a4350",
+          "#566273",
+          "#778395",
+          "#9ba6b5",
+          "#c1cad6",
+          "#e9eff7"
+        ]
+      },
+      "lifted-navy": {
+        "role": "neutral",
+        "displayName": "Lifted Navy",
+        "canonical": "oklch(33.0% 0.034 257.1)",
+        "source": "src/banner.rs HOVER",
+        "tonalRamp": [
+          "#080b11",
+          "#1f252e",
+          "#3a4350",
+          "#566273",
+          "#778395",
+          "#9ba6b5",
+          "#c1cad6",
+          "#e9eff7"
+        ]
+      },
+      "pressed-navy": {
+        "role": "neutral",
+        "displayName": "Pressed Navy",
+        "canonical": "oklch(38.6% 0.041 256.8)",
+        "source": "src/banner.rs PRESSED",
+        "tonalRamp": [
+          "#070b12",
+          "#1e2630",
+          "#384352",
+          "#546277",
+          "#748499",
+          "#99a6b8",
+          "#c0cad8",
+          "#e8eff9"
+        ]
+      }
     },
     "typographyMeta": {
-      "time-figures": { "displayName": "Time Figures", "purpose": "24-hour HH:MM at the top of the time column, each digit centred in a 12px cell and the colon in a 6px cell." },
-      "title": { "displayName": "Title", "purpose": "Notification summary, first line, one line ellipsized, paper." },
-      "body": { "displayName": "Body", "purpose": "Message preview, markup stripped, two lines ellipsized, paper dim. Weight is the theme default." },
-      "action": { "displayName": "Action", "purpose": "Action button labels, one line ellipsized." },
-      "app-label": { "displayName": "App Label", "purpose": "App name under the time, one line, slate; omitted when it repeats the title. Weight is the theme default." }
+      "time-figures": {
+        "displayName": "Time Figures",
+        "purpose": "24-hour HH:MM at the top of the time column, each digit centred in a 12px cell and the colon in a 6px cell."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Notification summary, first line, one line ellipsized, paper."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Message preview, markup stripped, two lines ellipsized, paper dim. Weight is the theme default."
+      },
+      "action": {
+        "displayName": "Action",
+        "purpose": "Action button labels, one line ellipsized."
+      },
+      "app-label": {
+        "displayName": "App Label",
+        "purpose": "App name under the time, one line, slate; omitted when it repeats the title. Weight is the theme default."
+      }
     },
     "shadows": [],
     "motion": [],
@@ -27,7 +162,15 @@
       "kind": "linux-desktop",
       "toolkit": "libcosmic/iced layer-shell (COSMIC 1.11)",
       "tokenSource": "Rust constants in src/banner.rs",
-      "fixedMeasures": { "bannerWidth": "420px", "timeColumn": "72px", "digitCell": "12px", "colonCell": "6px", "iconSize": "32px", "stackGap": "8px", "columnRule": "1px" }
+      "fixedMeasures": {
+        "bannerWidth": "420px",
+        "timeColumn": "72px",
+        "digitCell": "12px",
+        "colonCell": "6px",
+        "iconSize": "32px",
+        "stackGap": "8px",
+        "columnRule": "1px"
+      }
     }
   },
   "components": [
@@ -83,11 +226,31 @@
       "Actions are bold text, never filled pills."
     ],
     "rules": [
-      { "name": "The One Red Rule", "body": "Timetable red marks critical urgency and nothing else. It never tints text, icons, buttons or borders.", "section": "colors" },
-      { "name": "The Tier Lives In The Time Column Rule", "body": "Urgency is shown only in the time column: low dims the figures to slate, normal sets them in paper, critical fills the column red. The content side looks the same at every tier.", "section": "colors" },
-      { "name": "The Fixed Cell Rule", "body": "Times are always set in fixed per-character cells, never as a free text run, so every banner's figures and colon fall on the same verticals.", "section": "typography" },
-      { "name": "The Nothing Twice Rule", "body": "A label that repeats the title is dropped.", "section": "typography" },
-      { "name": "The Printed Sheet Rule", "body": "A banner is a printed sheet: it never casts a shadow or carries an outline.", "section": "elevation" }
+      {
+        "name": "The One Red Rule",
+        "body": "Timetable red marks critical urgency and nothing else. It never tints text, icons, buttons or borders.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tier Lives In The Time Column Rule",
+        "body": "Urgency is shown only in the time column: low dims the figures to slate, normal sets them in paper, critical fills the column red. The content side looks the same at every tier.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fixed Cell Rule",
+        "body": "Times are always set in fixed per-character cells, never as a free text run, so every banner's figures and colon fall on the same verticals.",
+        "section": "typography"
+      },
+      {
+        "name": "The Nothing Twice Rule",
+        "body": "A label that repeats the title is dropped.",
+        "section": "typography"
+      },
+      {
+        "name": "The Printed Sheet Rule",
+        "body": "A banner is a printed sheet: it never casts a shadow or carries an outline.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "**Do** keep the time column at 72px and at the same x on every banner; the stack must read as one table.",
@@ -103,5 +266,8 @@
       "**Don't** fill action buttons at rest or style them as pills.",
       "**Don't** label anything twice: drop the app name when it equals the title."
     ]
-  }
+  },
+  "notes": [
+    "2026-11-28: colours now resolve from the active COSMIC theme (see DESIGN.md colors). Hex values in this sidecar record the original fixed timetable palette and the Nord-style theme it was verified on; banner.rs no longer hardcodes them."
+  ]
 }

@@ -14,17 +14,54 @@ const PADDING: f32 = 12.0;
 const ICON_SIZE: u16 = 32;
 /// Width of the time column; fixed so every banner's rule lines up.
 const TIME_COL: f32 = 72.0;
-const RADIUS: f32 = 6.0;
 
-// Timetable palette: navy strip, paper type, slate secondary, one red.
-const NAVY: Color = Color::from_rgb8(0x12, 0x1c, 0x28);
-const PAPER: Color = Color::from_rgb8(0xf2, 0xf0, 0xea);
-const PAPER_DIM: Color = Color::from_rgba8(0xf2, 0xf0, 0xea, 0.74);
-const SLATE: Color = Color::from_rgb8(0x8c, 0x98, 0xa6);
-const RED: Color = Color::from_rgb8(0xc8, 0x24, 0x3a);
-const RULE: Color = Color::from_rgb8(0x2a, 0x36, 0x47);
-const HOVER: Color = Color::from_rgb8(0x2a, 0x36, 0x47);
-const PRESSED: Color = Color::from_rgb8(0x36, 0x45, 0x5a);
+/// Colour roles, resolved against the active COSMIC theme at draw time:
+/// the strip is the theme background, type its foreground, secondary type
+/// dimmed foreground, the rule the theme divider, and critical urgency the
+/// theme's destructive colour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tone {
+    /// Titles, time figures, action labels.
+    Fg,
+    /// Body preview.
+    Body,
+    /// Low-urgency figures, app name, dismiss glyph.
+    Dim,
+    /// Figures and app name on the critical (destructive) fill.
+    OnCritical,
+}
+
+const PAPER: Tone = Tone::Fg;
+const PAPER_DIM: Tone = Tone::Body;
+const SLATE: Tone = Tone::Dim;
+
+pub fn rgb(theme: &cosmic::Theme, tone: Tone) -> Color {
+    let c = theme.cosmic();
+    let alpha = |a: f32| {
+        let mut x: Color = c.on_bg_color().into();
+        x.a *= a;
+        x
+    };
+    match tone {
+        Tone::Fg => c.on_bg_color().into(),
+        Tone::Body => alpha(0.78),
+        Tone::Dim => alpha(0.64),
+        Tone::OnCritical => c.on_destructive_color().into(),
+    }
+}
+
+/// Text class for a tone (`Text::Custom` needs a plain fn per tone).
+fn color(tone: Tone) -> cosmic::theme::Text {
+    fn style(c: Color) -> cosmic::iced::widget::text::Style {
+        cosmic::iced::widget::text::Style { color: Some(c), ..Default::default() }
+    }
+    cosmic::theme::Text::Custom(match tone {
+        Tone::Fg => |t| style(rgb(t, Tone::Fg)),
+        Tone::Body => |t| style(rgb(t, Tone::Body)),
+        Tone::Dim => |t| style(rgb(t, Tone::Dim)),
+        Tone::OnCritical => |t| style(rgb(t, Tone::OnCritical)),
+    })
+}
 
 pub const BANNER_WIDTH: f32 = 420.0;
 /// Minimum height of a banner's layer surface. Must stay below the smallest
@@ -129,7 +166,7 @@ const COLON_CELL: f32 = 6.0;
 /// `HH:MM` set in fixed cells, so every banner's figures and colon line up
 /// like a timetable column whatever the digits (the font's own figures are
 /// proportional and iced cannot request tabular ones).
-fn time_figures<'a, M: 'a>(label: &str, color: Color) -> Element<'a, M> {
+fn time_figures<'a, M: 'a>(label: &str, tone: Tone) -> Element<'a, M> {
     let mut row = Row::new();
     for c in label.chars() {
         let cell = if c == ':' { COLON_CELL } else { DIGIT_CELL };
@@ -138,7 +175,7 @@ fn time_figures<'a, M: 'a>(label: &str, color: Color) -> Element<'a, M> {
                 text(c.to_string())
                     .size(20)
                     .font(cosmic::font::bold())
-                    .class(cosmic::theme::Text::Color(color)),
+                    .class(color(tone)),
             )
             .center_x(Length::Fixed(cell)),
         );
@@ -166,10 +203,10 @@ pub fn icon_name(n: &Notification) -> Option<&str> {
     }
 }
 
-/// Corner radius of the banner card. Fixed by the timetable world, not the
-/// theme, so the compositor clip always matches the drawn strip.
-pub fn card_radius(_theme: &cosmic::Theme) -> [f32; 4] {
-    [RADIUS; 4]
+/// Corner radius of the banner card: the theme's medium radius, so banners
+/// round like the rest of the desktop and the compositor clip matches.
+pub fn card_radius(theme: &cosmic::Theme) -> [f32; 4] {
+    theme.cosmic().corner_radii.radius_m
 }
 
 /// `HH:MM`, 24-hour, as a timetable prints it.
@@ -233,7 +270,8 @@ pub fn card<'a, M: Clone + 'a>(
     // ---- time column ----
     let figure_color = match tier {
         Tier::Low => SLATE,
-        _ => PAPER,
+        Tier::Critical => Tone::OnCritical,
+        Tier::Normal => PAPER,
     };
     let mut time_col = Column::new()
         .push(time_figures(&clock_label(n.time), figure_color))
@@ -245,9 +283,9 @@ pub fn card<'a, M: Clone + 'a>(
                 .size(11)
                 .width(Length::Fill)
                 .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
-                .class(cosmic::theme::Text::Color(match tier {
+                .class(color(match tier {
                     // Full paper on red: dimmed paper falls under 4.5:1.
-                    Tier::Critical => PAPER,
+                    Tier::Critical => Tone::OnCritical,
                     _ => SLATE,
                 })),
         );
@@ -256,11 +294,12 @@ pub fn card<'a, M: Clone + 'a>(
         .padding([PADDING, 0.0, PADDING, PADDING])
         .width(Length::Fixed(TIME_COL))
         .height(Length::Fill)
-        .class(cosmic::theme::Container::custom(move |_| {
+        .class(cosmic::theme::Container::custom(move |t| {
+            let r = card_radius(t);
             cosmic::iced::widget::container::Style {
-                background: (tier == Tier::Critical).then_some(Background::Color(RED)),
+                background: (tier == Tier::Critical).then_some(Background::Color(t.cosmic().destructive_color().into())),
                 border: cosmic::iced::Border {
-                    radius: [RADIUS, 0.0, 0.0, RADIUS].into(),
+                    radius: [r[0], 0.0, 0.0, r[3]].into(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -270,9 +309,9 @@ pub fn card<'a, M: Clone + 'a>(
     let rule = container(Space::new().width(Length::Fixed(1.0)).height(Length::Fill))
         .width(Length::Fixed(1.0))
         .height(Length::Fill)
-        .class(cosmic::theme::Container::custom(move |_| {
+        .class(cosmic::theme::Container::custom(move |t| {
             cosmic::iced::widget::container::Style {
-                background: (tier != Tier::Critical).then_some(Background::Color(RULE)),
+                background: (tier != Tier::Critical).then_some(Background::Color(t.cosmic().bg_divider().into())),
                 ..Default::default()
             }
         }));
@@ -305,7 +344,7 @@ pub fn card<'a, M: Clone + 'a>(
         .font(cosmic::font::bold())
         .width(Length::Fill)
         .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
-        .class(cosmic::theme::Text::Color(PAPER));
+        .class(color(PAPER));
 
     let mut texts = Column::new().push(title).spacing(2).width(Length::Fill);
     if let Some(body) = body_preview(&n.body) {
@@ -314,7 +353,7 @@ pub fn card<'a, M: Clone + 'a>(
                 .size(14)
                 .width(Length::Fill)
                 .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(2)))
-                .class(cosmic::theme::Text::Color(PAPER_DIM)),
+                .class(color(PAPER_DIM)),
         );
     }
 
@@ -381,13 +420,13 @@ pub fn card<'a, M: Clone + 'a>(
             .height(Length::Shrink),
     )
     .width(Length::Fixed(BANNER_WIDTH))
-    .class(cosmic::theme::Container::custom(|_| {
+    .class(cosmic::theme::Container::custom(|t| {
         cosmic::iced::widget::container::Style {
-            icon_color: Some(PAPER),
-            text_color: Some(PAPER),
-            background: Some(Background::Color(NAVY)),
+            icon_color: Some(rgb(t, PAPER)),
+            text_color: Some(rgb(t, PAPER)),
+            background: Some(Background::Color(t.cosmic().bg_color().into())),
             border: cosmic::iced::Border {
-                radius: RADIUS.into(),
+                radius: card_radius(t).into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -396,9 +435,9 @@ pub fn card<'a, M: Clone + 'a>(
     .into()
 }
 
-/// Flat text/icon button on navy: no fill at rest, a lifted navy on hover,
-/// deeper on press. `fg` colours its label or icon.
-fn flat_button(fg: Color) -> cosmic::theme::Button {
+/// Flat text/icon button: no fill at rest, the theme's component hover and
+/// pressed fills under the pointer. `fg` colours its label or icon.
+fn flat_button(fg: Tone) -> cosmic::theme::Button {
     fn style(fg: Color, bg: Option<Color>) -> button::Style {
         let mut s = button::Style::new();
         s.background = bg.map(Background::Color);
@@ -408,10 +447,14 @@ fn flat_button(fg: Color) -> cosmic::theme::Button {
         s
     }
     cosmic::theme::Button::Custom {
-        active: Box::new(move |_, _| style(fg, None)),
-        disabled: Box::new(move |_| style(SLATE, None)),
-        hovered: Box::new(move |_, _| style(PAPER, Some(HOVER))),
-        pressed: Box::new(move |_, _| style(PAPER, Some(PRESSED))),
+        active: Box::new(move |_, t| style(rgb(t, fg), None)),
+        disabled: Box::new(move |t| style(rgb(t, SLATE), None)),
+        hovered: Box::new(move |_, t| {
+            style(rgb(t, PAPER), Some(t.cosmic().background(t.transparent).component.hover.into()))
+        }),
+        pressed: Box::new(move |_, t| {
+            style(rgb(t, PAPER), Some(t.cosmic().background(t.transparent).component.pressed.into()))
+        }),
     }
 }
 
