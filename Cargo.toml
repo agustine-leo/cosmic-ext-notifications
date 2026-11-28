@@ -17,6 +17,7 @@ libcosmic = { git = "https://github.com/pop-os/libcosmic", default-features = fa
     "dbus-config",
 ] }
 anyhow = "1.0"
+libc = "0.2"
 color-backtrace = "0.7.2"
 cosmic-notifications-util = { path = "./cosmic-notifications-util" }
 cosmic-notifications-config = { path = "./cosmic-notifications-config" }

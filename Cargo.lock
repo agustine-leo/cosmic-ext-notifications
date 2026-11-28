@@ -986,6 +986,7 @@ dependencies = [
  "cosmic-notifications-util",
  "cosmic-panel-config",
  "enumflags2",
+ "libc",
  "libcosmic",
  "rustix 1.1.5",
  "tokio",

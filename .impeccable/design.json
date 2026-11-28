@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-28T14:00:00Z",
+  "title": "Design System: cosmic-ext-notifications",
+  "extensions": {
+    "colorMeta": {
+      "timetable-navy": { "role": "neutral", "displayName": "Timetable Navy", "canonical": "oklch(22.3% 0.028 253.5)", "source": "src/banner.rs NAVY", "tonalRamp": ["#080b10", "#20262d", "#3b434d", "#576270", "#788492", "#9ca6b2", "#c2cad3", "#eaeff6"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(95.5% 0.008 91.5)", "source": "src/banner.rs PAPER", "tonalRamp": ["#0c0b0a", "#262523", "#43423e", "#63615c", "#84827d", "#a6a5a1", "#cac9c6", "#efeeec"] },
+      "paper-dim": { "role": "neutral", "displayName": "Paper Dim", "canonical": "rgba(242, 240, 234, 0.74)", "source": "src/banner.rs PAPER_DIM", "tonalRamp": ["#0c0b0a", "#262523", "#43423e", "#63615c", "#84827d", "#a6a5a1", "#cac9c6", "#efeeec"] },
+      "slate": { "role": "neutral", "displayName": "Slate", "canonical": "oklch(67.5% 0.025 252.3)", "source": "src/banner.rs SLATE", "tonalRamp": ["#080b0f", "#20262c", "#3b434c", "#58626e", "#798490", "#9da6b0", "#c3cad2", "#eaeff5"] },
+      "timetable-red": { "role": "primary", "displayName": "Timetable Red", "canonical": "oklch(54.2% 0.197 20.7)", "source": "src/banner.rs RED", "tonalRamp": ["#220001", "#4d000c", "#7d0b1e", "#b01e32", "#d94952", "#f27d7e", "#ffacab", "#ffdbd9"] },
+      "column-rule": { "role": "neutral", "displayName": "Column Rule", "canonical": "oklch(33.0% 0.034 257.1)", "source": "src/banner.rs RULE", "tonalRamp": ["#080b11", "#1f252e", "#3a4350", "#566273", "#778395", "#9ba6b5", "#c1cad6", "#e9eff7"] },
+      "lifted-navy": { "role": "neutral", "displayName": "Lifted Navy", "canonical": "oklch(33.0% 0.034 257.1)", "source": "src/banner.rs HOVER", "tonalRamp": ["#080b11", "#1f252e", "#3a4350", "#566273", "#778395", "#9ba6b5", "#c1cad6", "#e9eff7"] },
+      "pressed-navy": { "role": "neutral", "displayName": "Pressed Navy", "canonical": "oklch(38.6% 0.041 256.8)", "source": "src/banner.rs PRESSED", "tonalRamp": ["#070b12", "#1e2630", "#384352", "#546277", "#748499", "#99a6b8", "#c0cad8", "#e8eff9"] }
+    },
+    "typographyMeta": {
+      "time-figures": { "displayName": "Time Figures", "purpose": "24-hour HH:MM at the top of the time column, each digit centred in a 12px cell and the colon in a 6px cell." },
+      "title": { "displayName": "Title", "purpose": "Notification summary, first line, one line ellipsized, paper." },
+      "body": { "displayName": "Body", "purpose": "Message preview, markup stripped, two lines ellipsized, paper dim. Weight is the theme default." },
+      "action": { "displayName": "Action", "purpose": "Action button labels, one line ellipsized." },
+      "app-label": { "displayName": "App Label", "purpose": "App name under the time, one line, slate; omitted when it repeats the title. Weight is the theme default." }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [],
+    "platform": {
+      "kind": "linux-desktop",
+      "toolkit": "libcosmic/iced layer-shell (COSMIC 1.11)",
+      "tokenSource": "Rust constants in src/banner.rs",
+      "fixedMeasures": { "bannerWidth": "420px", "timeColumn": "72px", "digitCell": "12px", "colonCell": "6px", "iconSize": "32px", "stackGap": "8px", "columnRule": "1px" }
+    }
+  },
+  "components": [
+    {
+      "name": "Banner (normal urgency)",
+      "kind": "card",
+      "refersTo": "banner-card",
+      "description": "One timetable row: fixed time column, 1px rule, then picture, title, message, dismiss and actions.",
+      "html": "<div class=\"ds-banner\"><div class=\"ds-time\"><div class=\"ds-figs\"><span>1</span><span>3</span><span class=\"ds-colon\">:</span><span>5</span><span>1</span></div><div class=\"ds-app\">Whatsie</div></div><div class=\"ds-rule\"></div><div class=\"ds-content\"><div class=\"ds-head\"><div class=\"ds-icon\"></div><div class=\"ds-texts\"><div class=\"ds-title\">Mum</div><div class=\"ds-body\">Dinner at 7? Bring the dish you borrowed last week if you still have it.</div></div><button class=\"ds-dismiss\" aria-label=\"Dismiss\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\"><path fill=\"currentColor\" d=\"M4.3 4.3a1 1 0 0 1 1.4 0L8 6.6l2.3-2.3a1 1 0 1 1 1.4 1.4L9.4 8l2.3 2.3a1 1 0 0 1-1.4 1.4L8 9.4l-2.3 2.3a1 1 0 0 1-1.4-1.4L6.6 8 4.3 5.7a1 1 0 0 1 0-1.4z\"/></svg></button></div><div class=\"ds-actions\"><button class=\"ds-action\">Reply</button><button class=\"ds-action\">Mark as Read</button></div></div></div>",
+      "css": ".ds-banner { display: flex; width: 420px; background: #121c28; color: #f2f0ea; border-radius: 6px; overflow: hidden; font-family: Cantarell, sans-serif; } .ds-time { width: 72px; flex: none; padding: 12px 0 12px 12px; box-sizing: border-box; } .ds-figs { display: flex; font-size: 20px; font-weight: 700; color: #f2f0ea; } .ds-figs span { width: 12px; text-align: center; } .ds-figs .ds-colon { width: 6px; } .ds-app { margin-top: 2px; font-size: 11px; color: #8c98a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-rule { width: 1px; flex: none; background: #2a3647; } .ds-content { flex: 1; min-width: 0; padding: 12px 8px 12px 12px; display: flex; flex-direction: column; gap: 6px; } .ds-head { display: flex; gap: 4px; align-items: flex-start; } .ds-icon { width: 32px; height: 32px; flex: none; margin-right: 6px; background: #4a6b4f; } .ds-texts { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ds-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-body { font-size: 14px; color: rgba(242,240,234,0.74); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } .ds-dismiss { background: none; border: 0; padding: 4px; border-radius: 4px; color: #8c98a6; display: flex; cursor: pointer; } .ds-dismiss:hover, .ds-dismiss:focus-visible { background: #2a3647; color: #f2f0ea; outline: none; } .ds-dismiss:active { background: #36455a; } .ds-actions { display: flex; gap: 4px; padding-left: 34px; } .ds-action { background: none; border: 0; padding: 4px 8px; border-radius: 4px; font: 700 14px Cantarell, sans-serif; color: #f2f0ea; cursor: pointer; } .ds-action:hover, .ds-action:focus-visible { background: #2a3647; outline: none; } .ds-action:active { background: #36455a; }"
+    },
+    {
+      "name": "Time Column, critical",
+      "kind": "custom",
+      "refersTo": "time-column-critical",
+      "description": "Critical urgency: the time column fills timetable red, figures stay paper, the column rule is dropped.",
+      "html": "<div class=\"ds-crit\"><div class=\"ds-crit-time\"><div class=\"ds-crit-figs\"><span>0</span><span>9</span><span class=\"ds-crit-colon\">:</span><span>4</span><span>0</span></div><div class=\"ds-crit-app\">Battery</div></div><div class=\"ds-crit-content\"><div class=\"ds-crit-title\">Battery at 6%</div><div class=\"ds-crit-body\">Plug in now. The laptop suspends in about 4 minutes.</div></div></div>",
+      "css": ".ds-crit { display: flex; width: 420px; background: #121c28; color: #f2f0ea; border-radius: 6px; overflow: hidden; font-family: Cantarell, sans-serif; } .ds-crit-time { width: 72px; flex: none; padding: 12px 0 12px 12px; box-sizing: border-box; background: #c8243a; border-radius: 6px 0 0 6px; } .ds-crit-figs { display: flex; font-size: 20px; font-weight: 700; } .ds-crit-figs span { width: 12px; text-align: center; } .ds-crit-figs .ds-crit-colon { width: 6px; } .ds-crit-app { margin-top: 2px; font-size: 11px; color: #f2f0ea; } .ds-crit-content { flex: 1; padding: 12px 8px 12px 12px; } .ds-crit-title { font-size: 15px; font-weight: 700; } .ds-crit-body { margin-top: 2px; font-size: 14px; color: rgba(242,240,234,0.74); }"
+    },
+    {
+      "name": "Time Column, low",
+      "kind": "custom",
+      "refersTo": "time-column-low",
+      "description": "Low urgency: figures dim to slate; everything else unchanged.",
+      "html": "<div class=\"ds-low\"><div class=\"ds-low-figs\"><span>0</span><span>5</span><span class=\"ds-low-colon\">:</span><span>4</span><span>3</span></div><div class=\"ds-low-app\">Files</div></div>",
+      "css": ".ds-low { width: 72px; padding: 12px 0 12px 12px; box-sizing: border-box; background: #121c28; border-radius: 6px 0 0 6px; border-right: 1px solid #2a3647; font-family: Cantarell, sans-serif; } .ds-low-figs { display: flex; font-size: 20px; font-weight: 700; color: #8c98a6; } .ds-low-figs span { width: 12px; text-align: center; } .ds-low-figs .ds-low-colon { width: 6px; } .ds-low-app { margin-top: 2px; font-size: 11px; color: #8c98a6; }"
+    },
+    {
+      "name": "Action Button",
+      "kind": "button",
+      "refersTo": "button-action",
+      "description": "Bold flat text on navy; fills lifted navy on hover, pressed navy on press.",
+      "html": "<div class=\"ds-abar\"><button class=\"ds-abtn\">Open</button><button class=\"ds-abtn\">Show in Folder</button></div>",
+      "css": ".ds-abar { display: inline-flex; gap: 4px; padding: 8px; background: #121c28; border-radius: 6px; } .ds-abtn { background: none; border: 0; padding: 4px 8px; border-radius: 4px; font: 700 14px Cantarell, sans-serif; color: #f2f0ea; cursor: pointer; } .ds-abtn:hover, .ds-abtn:focus-visible { background: #2a3647; outline: none; } .ds-abtn:active { background: #36455a; } .ds-abtn:disabled { color: #8c98a6; background: none; }"
+    },
+    {
+      "name": "Dismiss Button",
+      "kind": "button",
+      "refersTo": "button-dismiss",
+      "description": "16px close glyph, slate at rest, paper on lifted navy when hovered.",
+      "html": "<div class=\"ds-dwrap\"><button class=\"ds-dbtn\" aria-label=\"Dismiss\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\"><path fill=\"currentColor\" d=\"M4.3 4.3a1 1 0 0 1 1.4 0L8 6.6l2.3-2.3a1 1 0 1 1 1.4 1.4L9.4 8l2.3 2.3a1 1 0 0 1-1.4 1.4L8 9.4l-2.3 2.3a1 1 0 0 1-1.4-1.4L6.6 8 4.3 5.7a1 1 0 0 1 0-1.4z\"/></svg></button></div>",
+      "css": ".ds-dwrap { display: inline-flex; padding: 8px; background: #121c28; border-radius: 6px; } .ds-dbtn { display: flex; background: none; border: 0; padding: 4px; border-radius: 4px; color: #8c98a6; cursor: pointer; } .ds-dbtn:hover, .ds-dbtn:focus-visible { background: #2a3647; color: #f2f0ea; outline: none; } .ds-dbtn:active { background: #36455a; color: #f2f0ea; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Nordic Timetable",
+    "overview": "Each banner is one row of a printed Nordic departure board: a deep navy strip with paper-white type, read left to right as when, then who, then what. A fixed-width time column on the left carries the arrival time in bold figures and the sending app beneath it; a hairline rule divides it from the content, where the sender picture or app icon sits beside a bold title and a two-line message. Because the time column sits at the same x on every banner, a stack of banners reads as a single table rather than a pile of cards.\n\nThe system is flat, dense and quiet. There is one neutral surface, two text tones and one alarm colour; urgency changes the time column only, never the content. It deliberately departs from the rounded icon-tile notification card of macOS and GNOME, which this desktop's owner rejected as generic.\n\nThe surface is a native COSMIC layer-shell banner drawn with libcosmic/iced. Tokens are Rust constants in `src/banner.rs`; type is the desktop face (Cantarell) through `cosmic::font::bold()` and the theme default.",
+    "keyCharacteristics": [
+      "A 72px time column at a fixed x on every banner, so stacked banners align as one table.",
+      "Time figures set in fixed cells (12px per digit, 6px for the colon) so columns of times line up although the face's figures are proportional.",
+      "Navy strip, paper type, slate secondary, one red reserved for critical urgency.",
+      "Flat: no shadow, no border, a 6px corner and a 1px column rule.",
+      "Actions are bold text, never filled pills."
+    ],
+    "rules": [
+      { "name": "The One Red Rule", "body": "Timetable red marks critical urgency and nothing else. It never tints text, icons, buttons or borders.", "section": "colors" },
+      { "name": "The Tier Lives In The Time Column Rule", "body": "Urgency is shown only in the time column: low dims the figures to slate, normal sets them in paper, critical fills the column red. The content side looks the same at every tier.", "section": "colors" },
+      { "name": "The Fixed Cell Rule", "body": "Times are always set in fixed per-character cells, never as a free text run, so every banner's figures and colon fall on the same verticals.", "section": "typography" },
+      { "name": "The Nothing Twice Rule", "body": "A label that repeats the title is dropped.", "section": "typography" },
+      { "name": "The Printed Sheet Rule", "body": "A banner is a printed sheet: it never casts a shadow or carries an outline.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** keep the time column at 72px and at the same x on every banner; the stack must read as one table.",
+      "**Do** set times as 24-hour `HH:MM` in fixed cells (12px digits, 6px colon).",
+      "**Do** show urgency only in the time column: slate figures for low, paper for normal, a red fill for critical.",
+      "**Do** keep actions as bold flat text buttons (4px radius, 4px by 8px padding) that fill only on hover and press.",
+      "**Do** keep banners flat on timetable navy with a 6px corner and a 1px column rule."
+    ],
+    "donts": [
+      "**Don't** use timetable red for anything except the critical time column.",
+      "**Don't** add shadows, outlines or gradients to banners.",
+      "**Don't** return to the rounded icon-tile notification card (macOS/GNOME style); it was rejected as generic.",
+      "**Don't** fill action buttons at rest or style them as pills.",
+      "**Don't** label anything twice: drop the app name when it equals the title."
+    ]
+  }
+}

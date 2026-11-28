@@ -2,9 +2,12 @@
 
 A fork of COSMIC's notifications daemon
 ([pop-os/cosmic-notifications](https://github.com/pop-os/cosmic-notifications))
-that draws GNOME-style notification banners: a 420px card with a 40px icon,
-bold one-line title, dimmed two-line body preview, a × close button in the
-top-right corner, and up to three equal-width action buttons along the bottom.
+that draws notification banners set like a printed timetable: a 420px navy
+strip with a fixed 72px time column (bold 24-hour figures in fixed cells, app
+name below), a hairline rule, then the sender picture, bold title, two-line
+body preview, a × close button and up to three text action buttons. Urgency
+lives in the time column: slate figures for low, paper for normal, a red
+column for critical. The design system is recorded in `DESIGN.md`.
 
 Only the banner drawing changes. The D-Bus server, the applet socket, config
 keys, Do Not Disturb, timeouts, limits, grouping and activation all behave as

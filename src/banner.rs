@@ -1,17 +1,30 @@
 use cosmic::Element;
 use cosmic::iced::{Alignment, Background, Color, Length};
-use cosmic::iced::widget::{Column, Row};
+use cosmic::iced::widget::{Column, Row, Space};
 use cosmic::iced::core::text::{Ellipsize, EllipsizeHeightLimit};
-use cosmic::widget::{button, container, divider, icon, mouse_area, text};
+use cosmic::widget::{button, container, icon, mouse_area, text};
 use cosmic_notifications_util::{ActionId, Image, Notification};
+use std::time::SystemTime;
 
 /// 16x16 close glyph, embedded because some icon themes blank
 /// `window-close-symbolic`. Rendered symbolic so it takes the theme colour.
 const CLOSE_SVG: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="#232323" d="M4.3 4.3a1 1 0 0 1 1.4 0L8 6.6l2.3-2.3a1 1 0 1 1 1.4 1.4L9.4 8l2.3 2.3a1 1 0 0 1-1.4 1.4L8 9.4l-2.3 2.3a1 1 0 0 1-1.4-1.4L6.6 8 4.3 5.7a1 1 0 0 1 0-1.4z"/></svg>"##;
 
-const PADDING: u16 = 12;
-const ICON_SIZE: u16 = 40;
-const ACTION_HEIGHT: f32 = 40.0;
+const PADDING: f32 = 12.0;
+const ICON_SIZE: u16 = 32;
+/// Width of the time column; fixed so every banner's rule lines up.
+const TIME_COL: f32 = 72.0;
+const RADIUS: f32 = 6.0;
+
+// Timetable palette: navy strip, paper type, slate secondary, one red.
+const NAVY: Color = Color::from_rgb8(0x12, 0x1c, 0x28);
+const PAPER: Color = Color::from_rgb8(0xf2, 0xf0, 0xea);
+const PAPER_DIM: Color = Color::from_rgba8(0xf2, 0xf0, 0xea, 0.74);
+const SLATE: Color = Color::from_rgb8(0x8c, 0x98, 0xa6);
+const RED: Color = Color::from_rgb8(0xc8, 0x24, 0x3a);
+const RULE: Color = Color::from_rgb8(0x2a, 0x36, 0x47);
+const HOVER: Color = Color::from_rgb8(0x2a, 0x36, 0x47);
+const PRESSED: Color = Color::from_rgb8(0x36, 0x45, 0x5a);
 
 pub const BANNER_WIDTH: f32 = 420.0;
 /// Minimum height of a banner's layer surface. Must stay below the smallest
@@ -109,14 +122,104 @@ pub fn raster_display_size(w: u32, h: u32, scale: f32) -> f32 {
     (w.min(h) as f32 / scale).clamp(1.0, f32::from(ICON_SIZE))
 }
 
-/// Corner radius of the banner card (theme `radius_m`).
-pub fn card_radius(theme: &cosmic::Theme) -> [f32; 4] {
-    theme.cosmic().corner_radii.radius_m
+/// Width of one figure cell, and of the colon cell, for 20px bold digits.
+const DIGIT_CELL: f32 = 12.0;
+const COLON_CELL: f32 = 6.0;
+
+/// `HH:MM` set in fixed cells, so every banner's figures and colon line up
+/// like a timetable column whatever the digits (the font's own figures are
+/// proportional and iced cannot request tabular ones).
+fn time_figures<'a, M: 'a>(label: &str, color: Color) -> Element<'a, M> {
+    let mut row = Row::new();
+    for c in label.chars() {
+        let cell = if c == ':' { COLON_CELL } else { DIGIT_CELL };
+        row = row.push(
+            container(
+                text(c.to_string())
+                    .size(20)
+                    .font(cosmic::font::bold())
+                    .class(cosmic::theme::Text::Color(color)),
+            )
+            .center_x(Length::Fixed(cell)),
+        );
+    }
+    row.into()
 }
 
-/// GNOME-style notification banner: icon, bold title, dim body, × at the
-/// top right, optional equal-width action row flush to the bottom. `scale`
-/// is the output scale factor, used to keep image-data icons sharp.
+/// Put a zero-width space after every space. With end-ellipsizing, the
+/// text engine otherwise breaks before a space and starts the next line
+/// with it, breaking the column's left edge.
+pub fn wrap_safe(s: &str) -> String {
+    s.replace(' ', " \u{200B}")
+}
+
+/// The icon-theme name a banner would draw, if it draws one by name
+/// (`image-path`/`image` hint as a name, or `app_icon` that is not a file).
+pub fn icon_name(n: &Notification) -> Option<&str> {
+    match n.image() {
+        Some(Image::Name(name)) => Some(name.as_str()),
+        Some(_) => None,
+        None => {
+            let a = n.app_icon.as_str();
+            (!a.is_empty() && !a.starts_with("file://") && !a.starts_with('/')).then_some(a)
+        }
+    }
+}
+
+/// Corner radius of the banner card. Fixed by the timetable world, not the
+/// theme, so the compositor clip always matches the drawn strip.
+pub fn card_radius(_theme: &cosmic::Theme) -> [f32; 4] {
+    [RADIUS; 4]
+}
+
+/// `HH:MM`, 24-hour, as a timetable prints it.
+pub fn hhmm(hour: u32, minute: u32) -> String {
+    format!("{:02}:{:02}", hour % 24, minute % 60)
+}
+
+/// Local wall-clock time of `t` as `HH:MM`; empty if it cannot be resolved.
+pub fn clock_label(t: SystemTime) -> String {
+    let Ok(secs) = t.duration_since(SystemTime::UNIX_EPOCH) else {
+        return String::new();
+    };
+    let Ok(secs) = libc::time_t::try_from(secs.as_secs()) else {
+        return String::new();
+    };
+    // SAFETY: localtime_r writes only into `tm`, which we own.
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    if unsafe { libc::localtime_r(&secs, &mut tm) }.is_null() {
+        return String::new();
+    }
+    hhmm(tm.tm_hour as u32, tm.tm_min as u32)
+}
+
+/// App name for the time column, or `None` when it would only repeat the
+/// title (nothing is labelled twice) or is empty.
+pub fn app_label<'a>(app_name: &'a str, title: &str) -> Option<&'a str> {
+    let name = app_name.trim();
+    (!name.is_empty() && !name.eq_ignore_ascii_case(title.trim())).then_some(name)
+}
+
+/// Urgency tier, as the time column prints it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Tier {
+    Low,
+    Normal,
+    Critical,
+}
+
+pub fn tier(urgency: u8) -> Tier {
+    match urgency {
+        0 => Tier::Low,
+        2 => Tier::Critical,
+        _ => Tier::Normal,
+    }
+}
+
+/// Timetable banner: a fixed-width time column (time, app) ruled off from
+/// the content (picture, sender, message, ×, actions). The time column sits
+/// at the same x on every banner, so a stack reads as one table. `scale` is
+/// the output scale factor, used to keep image-data icons sharp.
 pub fn card<'a, M: Clone + 'a>(
     n: &'a Notification,
     scale: f32,
@@ -124,12 +227,70 @@ pub fn card<'a, M: Clone + 'a>(
     on_dismiss: M,
     on_action: impl Fn(ActionId) -> M + 'a,
 ) -> Element<'a, M> {
+    let tier = tier(n.urgency());
+    let summary = n.summary.lines().next().unwrap_or_default();
+
+    // ---- time column ----
+    let figure_color = match tier {
+        Tier::Low => SLATE,
+        _ => PAPER,
+    };
+    let mut time_col = Column::new()
+        .push(time_figures(&clock_label(n.time), figure_color))
+        .spacing(2)
+        .width(Length::Fill);
+    if let Some(app) = app_label(&n.app_name, summary) {
+        time_col = time_col.push(
+            text(app)
+                .size(11)
+                .width(Length::Fill)
+                .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
+                .class(cosmic::theme::Text::Color(match tier {
+                    // Full paper on red: dimmed paper falls under 4.5:1.
+                    Tier::Critical => PAPER,
+                    _ => SLATE,
+                })),
+        );
+    }
+    let time_col = container(time_col)
+        .padding([PADDING, 0.0, PADDING, PADDING])
+        .width(Length::Fixed(TIME_COL))
+        .height(Length::Fill)
+        .class(cosmic::theme::Container::custom(move |_| {
+            cosmic::iced::widget::container::Style {
+                background: (tier == Tier::Critical).then_some(Background::Color(RED)),
+                border: cosmic::iced::Border {
+                    radius: [RADIUS, 0.0, 0.0, RADIUS].into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        }));
+
+    let rule = container(Space::new().width(Length::Fixed(1.0)).height(Length::Fill))
+        .width(Length::Fixed(1.0))
+        .height(Length::Fill)
+        .class(cosmic::theme::Container::custom(move |_| {
+            cosmic::iced::widget::container::Style {
+                background: (tier != Tier::Critical).then_some(Background::Color(RULE)),
+                ..Default::default()
+            }
+        }));
+
+    // ---- content column ----
     let fallback = || icon::from_name("dialog-information-symbolic").icon();
     let notif_icon: Element<'a, M> = match icon_choice(n, scale) {
-        IconChoice::Default => n.notification_icon().unwrap_or_else(fallback).size(ICON_SIZE).into(),
+        IconChoice::Default => match icon_name(n) {
+            // A name the icon theme cannot resolve would draw an empty slot.
+            Some(name) if icon::from_name(name).path().is_none() => fallback(),
+            _ => n.notification_icon().unwrap_or_else(fallback),
+        }
+        .size(ICON_SIZE)
+        .into(),
         IconChoice::Raster(size) => {
-            let raster = n.notification_icon().unwrap_or_else(fallback);
-            let raster = raster
+            let raster = n
+                .notification_icon()
+                .unwrap_or_else(fallback)
                 .width(Length::Fixed(size))
                 .height(Length::Fixed(size))
                 .content_fit(cosmic::iced::ContentFit::Contain);
@@ -139,24 +300,21 @@ pub fn card<'a, M: Clone + 'a>(
         }
     };
 
-    let title = text::heading(n.summary.lines().next().unwrap_or_default())
+    let title = text(summary)
+        .size(15)
+        .font(cosmic::font::bold())
         .width(Length::Fill)
-        .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)));
+        .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
+        .class(cosmic::theme::Text::Color(PAPER));
 
     let mut texts = Column::new().push(title).spacing(2).width(Length::Fill);
     if let Some(body) = body_preview(&n.body) {
         texts = texts.push(
-            text::body(body)
+            text(wrap_safe(&body))
+                .size(14)
                 .width(Length::Fill)
                 .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(2)))
-                .class(cosmic::theme::Text::Custom(|theme| {
-                    let mut c: Color = theme.cosmic().background(theme.transparent).component.on.into();
-                    c.a *= 0.7;
-                    cosmic::iced::widget::text::Style {
-                        color: Some(c),
-                        ..Default::default()
-                    }
-                })),
+                .class(cosmic::theme::Text::Color(PAPER_DIM)),
         );
     }
 
@@ -165,101 +323,95 @@ pub fn card<'a, M: Clone + 'a>(
     )
     .padding(4)
     .on_press(on_dismiss)
-    .class(cosmic::theme::Button::Icon);
+    .class(flat_button(SLATE));
 
-    // Only icon + text activate; × is a sibling outside the mouse_area.
+    // Only picture + text activate; × and actions sit outside the mouse_area.
     let activate = mouse_area(
         Row::new()
             .push(notif_icon)
             .push(texts)
-            .spacing(12)
-            .align_y(Alignment::Center)
+            .spacing(10)
+            .align_y(Alignment::Start)
             .width(Length::Fill),
     )
     .on_press(on_activate);
 
-    let upper = Row::new()
-        .push(activate)
-        .push(close)
-        .spacing(8)
-        .align_y(Alignment::Start);
-
-    let upper = container(upper).padding(PADDING).width(Length::Fill);
-
-    let mut content = Column::new().push(upper).width(Length::Fill);
+    let mut content = Column::new()
+        .push(
+            Row::new()
+                .push(activate)
+                .push(close)
+                .spacing(4)
+                .align_y(Alignment::Start),
+        )
+        .spacing(6)
+        .width(Length::Fill);
 
     let actions = action_buttons(&n.actions);
     if !actions.is_empty() {
-        let count = actions.len();
-        let mut row = Row::new()
-            .height(Length::Fixed(ACTION_HEIGHT))
-            .width(Length::Fill);
-        for (i, (id, label)) in actions.into_iter().enumerate() {
-            if i > 0 {
-                row = row.push(divider::vertical::default());
-            }
-            let msg = on_action(id);
+        let mut row = Row::new().spacing(4);
+        for (id, label) in actions {
             row = row.push(
                 button::custom(
-                    container(text::body(label).ellipsize(Ellipsize::End(
-                        EllipsizeHeightLimit::Lines(1),
-                    )))
-                    .center(Length::Fill)
-                    .padding([0, 8]),
+                    text(label)
+                        .size(14)
+                        .font(cosmic::font::bold())
+                        .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1))),
                 )
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .padding(0)
-                .on_press(msg)
-                .class(action_class(i == 0, i + 1 == count)),
+                .padding([4, 8])
+                .on_press(on_action(id))
+                .class(flat_button(PAPER)),
             );
         }
-        content = content
-            .push(divider::horizontal::default())
-            .push(row);
+        // Pull the first label's text in line with the title above it.
+        content = content.push(
+            container(row).padding([0.0, 0.0, 0.0, f32::from(ICON_SIZE) + 10.0 - 8.0]),
+        );
     }
 
-    container(content)
-        .width(Length::Fixed(BANNER_WIDTH))
-        .class(cosmic::theme::Container::custom(|theme| {
-            let cosmic = theme.cosmic();
-            let component = &cosmic.background(theme.transparent).component;
-            cosmic::iced::widget::container::Style {
-                icon_color: Some(component.on.into()),
-                text_color: Some(component.on.into()),
-                background: Some(Background::Color(component.base.into())),
-                border: cosmic::iced::Border {
-                    radius: card_radius(theme).into(),
-                    ..Default::default()
-                },
+    let content = container(content)
+        .padding([PADDING, PADDING - 4.0, PADDING, PADDING])
+        .width(Length::Fill);
+
+    container(
+        Row::new()
+            .push(time_col)
+            .push(rule)
+            .push(content)
+            .height(Length::Shrink),
+    )
+    .width(Length::Fixed(BANNER_WIDTH))
+    .class(cosmic::theme::Container::custom(|_| {
+        cosmic::iced::widget::container::Style {
+            icon_color: Some(PAPER),
+            text_color: Some(PAPER),
+            background: Some(Background::Color(NAVY)),
+            border: cosmic::iced::Border {
+                radius: RADIUS.into(),
                 ..Default::default()
-            }
-        }))
-        .into()
+            },
+            ..Default::default()
+        }
+    }))
+    .into()
 }
 
-/// Flat action button; only the outer bottom corners follow the card radius.
-fn action_class(first: bool, last: bool) -> cosmic::theme::Button {
-    fn style(first: bool, last: bool, theme: &cosmic::Theme, bg: Option<Color>) -> button::Style {
-        let r = card_radius(theme);
-        let on: Color = theme.cosmic().background(theme.transparent).component.on.into();
+/// Flat text/icon button on navy: no fill at rest, a lifted navy on hover,
+/// deeper on press. `fg` colours its label or icon.
+fn flat_button(fg: Color) -> cosmic::theme::Button {
+    fn style(fg: Color, bg: Option<Color>) -> button::Style {
         let mut s = button::Style::new();
         s.background = bg.map(Background::Color);
-        // iced radius order: top-left, top-right, bottom-right, bottom-left
-        s.border_radius = [0.0, 0.0, if last { r[2] } else { 0.0 }, if first { r[3] } else { 0.0 }].into();
-        s.text_color = Some(on);
-        s.icon_color = Some(on);
+        s.border_radius = 4.0.into();
+        s.text_color = Some(fg);
+        s.icon_color = Some(fg);
         s
     }
     cosmic::theme::Button::Custom {
-        active: Box::new(move |_, t| style(first, last, t, None)),
-        disabled: Box::new(move |t| style(first, last, t, None)),
-        hovered: Box::new(move |_, t| {
-            style(first, last, t, Some(t.cosmic().background(t.transparent).component.hover.into()))
-        }),
-        pressed: Box::new(move |_, t| {
-            style(first, last, t, Some(t.cosmic().background(t.transparent).component.pressed.into()))
-        }),
+        active: Box::new(move |_, _| style(fg, None)),
+        disabled: Box::new(move |_| style(SLATE, None)),
+        hovered: Box::new(move |_, _| style(PAPER, Some(HOVER))),
+        pressed: Box::new(move |_, _| style(PAPER, Some(PRESSED))),
     }
 }
 
@@ -277,7 +429,7 @@ mod tests {
         assert_eq!(body_preview("a&nbsp;b").as_deref(), Some("a b"));
     }
     #[test] fn surface_min_height_does_not_pad_smallest_card() {
-        let smallest_card = f32::from(2 * PADDING + ICON_SIZE);
+        let smallest_card = 2.0 * PADDING + f32::from(ICON_SIZE);
         assert!(SURFACE_MIN_HEIGHT < smallest_card, "{SURFACE_MIN_HEIGHT} >= {smallest_card}");
     }
     #[test] fn body_preview_inline_tags_do_not_split_words() {
@@ -318,8 +470,8 @@ mod tests {
     }
     #[test] fn raster_is_sized_by_output_scale() {
         assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 2.0), IconChoice::Raster(24.0));
-        assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 1.0), IconChoice::Raster(40.0));
-        assert_eq!(icon_choice(&notif("", Some(data(160, 160))), 2.0), IconChoice::Raster(40.0));
+        assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 1.0), IconChoice::Raster(32.0));
+        assert_eq!(icon_choice(&notif("", Some(data(160, 160))), 2.0), IconChoice::Raster(32.0));
         assert_eq!(icon_choice(&notif("", Some(data(48, 48))), 1.5), IconChoice::Raster(32.0));
     }
     #[test] fn app_icon_never_replaces_the_sent_picture() {
@@ -344,5 +496,40 @@ mod tests {
         assert_eq!(raster_display_size(48, 48, 0.0), f32::from(ICON_SIZE));
         assert_eq!(raster_display_size(48, 48, -2.0), f32::from(ICON_SIZE));
         assert_eq!(raster_display_size(48, 48, f32::NAN), f32::from(ICON_SIZE));
+    }
+    #[test] fn hhmm_pads_and_wraps() {
+        assert_eq!(hhmm(9, 5), "09:05");
+        assert_eq!(hhmm(23, 59), "23:59");
+        assert_eq!(hhmm(24, 60), "00:00");
+    }
+    #[test] fn clock_label_is_hh_mm() {
+        let l = clock_label(SystemTime::now());
+        assert_eq!(l.len(), 5, "{l}");
+        assert_eq!(&l[2..3], ":");
+    }
+    #[test] fn app_label_skips_empty_and_repeats() {
+        assert_eq!(app_label("WhatsApp", "Mum"), Some("WhatsApp"));
+        assert_eq!(app_label("  ", "Mum"), None);
+        assert_eq!(app_label("Battery", "battery"), None);
+    }
+    #[test] fn tier_maps_urgency() {
+        assert_eq!(tier(0), Tier::Low);
+        assert_eq!(tier(1), Tier::Normal);
+        assert_eq!(tier(2), Tier::Critical);
+        assert_eq!(tier(7), Tier::Normal);
+    }
+    #[test] fn icon_name_picks_drawn_name_only() {
+        assert_eq!(icon_name(&notif("zen", None)), Some("zen"));
+        assert_eq!(icon_name(&notif("", None)), None);
+        assert_eq!(icon_name(&notif("file:///a.png", None)), None);
+        assert_eq!(icon_name(&notif("zen", Some(Image::Name("avatar".into())))), Some("avatar"));
+        assert_eq!(icon_name(&notif("zen", Some(data(8, 8)))), None);
+    }
+    #[test] fn wrap_safe_breaks_after_spaces_only() {
+        assert_eq!(wrap_safe("a b"), "a \u{200B}b");
+        assert_eq!(wrap_safe("ab"), "ab");
+    }
+    #[test] fn time_cells_fit_the_time_column() {
+        assert!(PADDING + 4.0 * DIGIT_CELL + COLON_CELL <= TIME_COL - 4.0);
     }
 }
